@@ -4,11 +4,13 @@
 #include "lcd/LcdService.h"
 #include "mqtt/MqttClient.h"
 #include "otp/OtpService.h"
+#include "rfid/RfidService.h"
 
 KeypadService keypad;
 LcdService lcd;
 MqttClient mqtt;
 OtpService otp;
+RfidService rfid;
 
 namespace
 {
@@ -29,18 +31,29 @@ void setup()
     lcd.begin();
     lcd.print("Waiting ...");
     mqtt.begin();
+    rfid.begin();
 
-    mqtt.subscribe(AppConfig::Topics::OTP, [](const char *payload, unsigned int length)
-    {
-        otp.setOtp(payload, length);
-        lcd.clear();
-        lcd.print("OTP received");
-    });
+    mqtt.subscribe(
+        AppConfig::Topics::OTP,
+        [](const char *payload, unsigned int length)
+        {
+            otp.setOtp(payload, length);
+            lcd.clear();
+            lcd.print("OTP received");
+        });
 }
 
 void loop()
 {
     mqtt.loop();
+
+    if (rfid.isCardPresent())
+    {
+        String uid = rfid.readUid();
+
+        Serial.print("RFID UID: ");
+        Serial.println(uid);
+    }
 
     char key = keypad.readkey();
     if (key == NO_KEY)
