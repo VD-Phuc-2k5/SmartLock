@@ -30,4 +30,5 @@ public:
     void begin() override;
     void loop() override;
     bool subscribe(const char *topic, MqttMessageHandler handler) override;
+    bool publish(const char *topic, const char *message) override;
 };

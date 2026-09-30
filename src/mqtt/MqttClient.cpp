@@ -87,6 +87,16 @@ bool MqttClient::subscribe(const char *topic, MqttMessageHandler handler)
     return true;
 }
 
+bool MqttClient::publish(const char *topic, const char *message)
+{
+    if (!mqttClient.connected())
+    {
+        return false;
+    }
+
+    return mqttClient.publish(topic, message);
+}
+
 void MqttClient::onMessage(char *topic, byte *payload, unsigned int length)
 {
     for (uint8_t i = 0; i < subscriptionCount; i++)
