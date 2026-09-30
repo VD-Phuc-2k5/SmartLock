@@ -22,4 +22,13 @@ namespace PinConfig
         constexpr uint8_t SDA = 8;
         constexpr uint8_t SCL = 9;
     }
+
+    namespace Rfid
+    {
+        constexpr uint8_t SS = 40;
+        constexpr uint8_t RST = 35;
+        constexpr uint8_t SCK = 39;
+        constexpr uint8_t MISO = 36;
+        constexpr uint8_t MOSI = 38;
+    }
 }
