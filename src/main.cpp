@@ -1,20 +1,24 @@
 #include <Arduino.h>
 #include "keypad/KeypadService.h"
+#include "lcd/LcdService.h"
 
 KeypadService keypad;
+LcdService lcd;
 
 void setup()
 {
     Serial.begin(115200);
     keypad.begin();
+    lcd.begin();
 }
 
 void loop()
 {
-    int key = keypad.readkey();
+    char key = keypad.readkey();
     if (key != NO_KEY)
     {
-        Serial.print("Key pressed: ");
-        Serial.println(key);
+        lcd.clear();
+        lcd.print("Key: ");
+        lcd.print(&key);
     }
 }
