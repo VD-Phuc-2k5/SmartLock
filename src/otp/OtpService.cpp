@@ -3,16 +3,17 @@
 #include <Arduino.h>
 #include <cstring>
 
-void OtpService::setOtp(const char *otp)
+void OtpService::setOtp(const char *otp, unsigned int length)
 {
-    if (otp == nullptr)
+    if (otp == nullptr || length == 0)
     {
         clear();
         return;
     }
 
-    std::strncpy(currentOtp, otp, OTP_LENGTH);
-    currentOtp[OTP_LENGTH] = '\0';
+    unsigned int n = length < AppConfig::Otp::LENGTH ? length : AppConfig::Otp::LENGTH;
+    std::memcpy(currentOtp, otp, n);
+    currentOtp[n] = '\0';
 
     otpSetAt = millis();
     attempts = 0;
@@ -26,7 +27,7 @@ bool OtpService::verify(const char *input)
         return false;
     }
 
-    if (isExpired() || attempts >= MAX_ATTEMPTS)
+    if (isExpired() || attempts >= AppConfig::Otp::MAX_ATTEMPTS)
     {
         clear();
         return false;
@@ -45,7 +46,7 @@ bool OtpService::verify(const char *input)
 
 bool OtpService::isExpired() const
 {
-    return active && (millis() - otpSetAt) >= OTP_TTL_MS;
+    return active && (millis() - otpSetAt) >= AppConfig::Otp::TTL_MS;
 }
 
 void OtpService::clear()
