@@ -27,6 +27,12 @@ namespace AppConfig
         constexpr uint8_t MAX_ATTEMPTS = 3;
     }
 
+    namespace Password
+    {
+        constexpr char MASTER[] = "111111";
+        constexpr uint8_t LENGTH = 6;
+    }
+
     namespace Lcd
     {
         constexpr uint8_t ADDRESS = 0x27;
@@ -43,5 +49,10 @@ namespace AppConfig
     namespace Topics
     {
         constexpr char OTP[] = "smartlock/device/esp32-01/otp";
+        constexpr char OTP_REQUEST[] = "smartlock/device/esp32-01/otp/request";
+        constexpr char CARD_ENROLL[] = "smartlock/device/esp32-01/card/enroll";
+        constexpr char CARD_VERIFY[] = "smartlock/device/esp32-01/card/verify";
+        constexpr char CARD_ENROLL_RESULT[] = "smartlock/device/esp32-01/card/enroll/result";
+        constexpr char CARD_VERIFY_RESULT[] = "smartlock/device/esp32-01/card/verify/result";
     }
 }
