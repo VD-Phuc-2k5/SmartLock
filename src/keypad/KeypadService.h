@@ -1,13 +1,12 @@
 #pragma once
 
 #include "IKeypad.h"
+#include "../config/AppConfig.h"
 #include <Keypad.h>
 
 class KeypadService : public IKeypad
 {
 private:
-    static constexpr byte ROWS = 4;
-    static constexpr byte COLS = 4;
     Keypad keypad;
 
 public:
