@@ -1,5 +1,6 @@
 export interface OtpRecord {
     deviceId: string;
+    email: string;
     code: string;
     expiresAt: number;
 }

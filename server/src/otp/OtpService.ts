@@ -8,9 +8,10 @@ export class OtpService {
         private readonly ttlMs: number,
     ) {}
 
-    issue(deviceId: string): OtpRecord {
+    issue(deviceId: string, email: string): OtpRecord {
         const record: OtpRecord = {
             deviceId,
+            email,
             code: this.generator.generate(),
             expiresAt: Date.now() + this.ttlMs,
         };
