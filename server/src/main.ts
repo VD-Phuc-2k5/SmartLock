@@ -4,11 +4,21 @@ import { RandomOtpGenerator } from './otp/OtpGenerator.js';
 import { InMemoryOtpStore } from './otp/OtpStore.js';
 import { OtpService } from './otp/OtpService.js';
 import { MqttClient } from './mqtt/MqttClient.js';
+import { SmtpMailer } from './mail/SmtpMailer.js';
+import { MqttNotifier } from './notify/MqttNotifier.js';
+import { EmailNotifier } from './notify/EmailNotifier.js';
+import { CompositeNotifier } from './notify/OtpNotifier.js';
 
 const generator = new RandomOtpGenerator(config.otp.length);
 const store = new InMemoryOtpStore();
 const otpService = new OtpService(generator, store, config.otp.ttlMs);
 const mqttClient = new MqttClient(config.mqtt.brokerUrl);
+
+const mailer = new SmtpMailer(config.smtp, config.email.from);
+const notifier = new CompositeNotifier([
+    new MqttNotifier(mqttClient),
+    new EmailNotifier(mailer, config.email.subject),
+]);
 
 await mqttClient.connect();
 
@@ -38,8 +48,9 @@ const server = http.createServer(async (req, res) => {
         const body = await readBody(req);
 
         let deviceId: unknown;
+        let email: unknown;
         try {
-            ({ deviceId } = parseJson(body));
+            ({ deviceId, email } = parseJson(body));
         } catch {
             sendJson(res, 400, { error: 'invalid JSON body' });
             return;
@@ -50,9 +61,14 @@ const server = http.createServer(async (req, res) => {
             return;
         }
 
-        const record = otpService.issue(deviceId);
-        mqttClient.publish(`smartlock/device/${deviceId}/otp`, record.code);
-        console.log(`[OTP] device=${deviceId} code=${record.code} expiresAt=${new Date(record.expiresAt).toISOString()}`);
+        if (typeof email !== 'string' || !email.includes('@')) {
+            sendJson(res, 400, { error: 'email is required' });
+            return;
+        }
+
+        const record = otpService.issue(deviceId, email);
+        await notifier.notify(record);
+        console.log(`[OTP] device=${deviceId} email=${email} code=${record.code} expiresAt=${new Date(record.expiresAt).toISOString()}`);
 
         sendJson(res, 200, { deviceId, expiresAt: record.expiresAt });
         return;
