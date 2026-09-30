@@ -1,8 +1,12 @@
+#include "../config/AppConfig.h"
 #include "../config/PinConfig.h"
 #include "LcdService.h"
 #include <Wire.h>
 
-LcdService::LcdService() : lcd(LCD_ADDRESS, LCD_COLUMNS, LCD_ROWS) {}
+LcdService::LcdService()
+    : lcd(AppConfig::Lcd::ADDRESS, AppConfig::Lcd::COLUMNS, AppConfig::Lcd::ROWS)
+{
+}
 
 void LcdService::begin()
 {
