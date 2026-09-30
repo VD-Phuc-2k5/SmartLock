@@ -39,6 +39,13 @@
       "top": 400,
       "left": 312.8,
       "attrs": { "pins": "i2c" }
+    },
+    {
+      "type": "board-mfrc522",
+      "id": "rfid1",
+      "top": 160.55,
+      "left": 320.24,
+      "attrs": {}
     }
   ],
   "connections": [
@@ -55,7 +62,14 @@
     ["lcd:GND", "esp:GND.1", "cyan", ["h0"]],
     ["lcd:VCC", "esp:5V", "red", ["h0"]],
     ["lcd:SDA", "esp:8", "violet", ["h0"]],
-    ["lcd:SCL", "esp:9", "violet", ["h0"]]
+    ["lcd:SCL", "esp:9", "violet", ["h0"]],
+    ["rfid1:SDA", "esp:40", "green", ["h0"]],
+    ["rfid1:SCK", "esp:39", "green", ["h0"]],
+    ["rfid1:MOSI", "esp:38", "green", ["h0"]],
+    ["rfid1:MISO", "esp:36", "green", ["h0"]],
+    ["rfid1:RST", "esp:35", "green", ["h0"]],
+    ["rfid1:GND", "esp:GND.4", "black", ["h0"]],
+    ["rfid1:3.3V", "esp:3V3.1", "green", ["h0"]]
   ],
   "serialMonitor": { "convertEol": true, "display": "always" },
   "dependencies": {}
