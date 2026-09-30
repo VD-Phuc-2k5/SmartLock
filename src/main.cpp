@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include "config/AppConfig.h"
 #include "keypad/KeypadService.h"
 #include "lcd/LcdService.h"
 #include "mqtt/MqttClient.h"
@@ -11,8 +12,7 @@ OtpService otp;
 
 namespace
 {
-    constexpr uint8_t OTP_INPUT_LENGTH = 6;
-    char inputOtp[OTP_INPUT_LENGTH + 1] = {};
+    char inputOtp[AppConfig::Otp::LENGTH + 1] = {};
     uint8_t inputLength = 0;
 }
 
@@ -29,19 +29,18 @@ void setup()
     lcd.begin();
     lcd.print("Waiting ...");
     mqtt.begin();
+
+    mqtt.subscribe(AppConfig::Topics::OTP, [](const char *payload, unsigned int length)
+    {
+        otp.setOtp(payload, length);
+        lcd.clear();
+        lcd.print("OTP received");
+    });
 }
 
 void loop()
 {
     mqtt.loop();
-
-    if (mqtt.hasMessage())
-    {
-        otp.setOtp(mqtt.getMessage());
-        lcd.clear();
-        lcd.print("OTP received");
-        mqtt.clearMessage();
-    }
 
     char key = keypad.readkey();
     if (key == NO_KEY)
@@ -51,7 +50,7 @@ void loop()
 
     if (key >= '0' && key <= '9')
     {
-        if (inputLength < OTP_INPUT_LENGTH)
+        if (inputLength < AppConfig::Otp::LENGTH)
         {
             inputOtp[inputLength++] = key;
             inputOtp[inputLength] = '\0';
