@@ -20,6 +20,10 @@ export const config = {
     },
     email: {
         from: process.env.SMTP_FROM ?? '',
+        to: process.env.SMTP_USER ?? '',
         subject: process.env.EMAIL_SUBJECT ?? 'Your Smart Lock OTP',
+    },
+    card: {
+        filePath: process.env.CARD_FILE ?? './data/cards.json',
     },
 };
