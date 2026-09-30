@@ -9,7 +9,7 @@ namespace
     constexpr uint16_t MQTT_PORT = 1883;
 
     constexpr char MQTT_TOPIC[] =
-        "smartlock/device/esp32-01/test";
+        "smartlock/device/esp32-01/otp";
 
     constexpr char MQTT_CLIENT_ID[] = "smartlock-esp32-01";
 
