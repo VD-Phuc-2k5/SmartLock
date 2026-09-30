@@ -1,3 +1,5 @@
+import 'dotenv/config';
+
 export const config = {
     mqtt: {
         brokerUrl: process.env.MQTT_BROKER_URL ?? 'mqtt://localhost:1883',
@@ -8,5 +10,16 @@ export const config = {
     otp: {
         length: 6,
         ttlMs: 5 * 60 * 1000,
+    },
+    smtp: {
+        host: process.env.SMTP_HOST ?? 'smtp.gmail.com',
+        port: Number(process.env.SMTP_PORT ?? 465),
+        secure: (process.env.SMTP_SECURE ?? 'true') === 'true',
+        user: process.env.SMTP_USER ?? '',
+        pass: process.env.SMTP_PASS ?? '',
+    },
+    email: {
+        from: process.env.SMTP_FROM ?? '',
+        subject: process.env.EMAIL_SUBJECT ?? 'Your Smart Lock OTP',
     },
 };
