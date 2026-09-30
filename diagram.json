@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "author": "Võ Đức Phúc",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "board-esp32-s3-devkitc-1",
+      "id": "esp",
+      "top": 115.02,
+      "left": 148.57,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-breadboard",
+      "id": "bb1",
+      "top": 158.6,
+      "left": -936.8,
+      "rotate": 90,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-breadboard",
+      "id": "bb2",
+      "top": 158.6,
+      "left": -725.6,
+      "rotate": 90,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-membrane-keypad",
+      "id": "keypad",
+      "top": -222.8,
+      "left": -80.8,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-lcd1602",
+      "id": "lcd",
+      "top": 400,
+      "left": 312.8,
+      "attrs": { "pins": "i2c" }
+    }
+  ],
+  "connections": [
+    ["esp:TX", "$serialMonitor:RX", "", []],
+    ["esp:RX", "$serialMonitor:TX", "", []],
+    ["keypad:R1", "esp:4", "green", ["v0"]],
+    ["keypad:R2", "esp:5", "green", ["v0"]],
+    ["keypad:R3", "esp:6", "green", ["v0"]],
+    ["keypad:R4", "esp:7", "green", ["v0"]],
+    ["keypad:C1", "esp:10", "#8f4814", ["v0"]],
+    ["keypad:C2", "esp:11", "#8f4814", ["v0"]],
+    ["keypad:C3", "esp:12", "#8f4814", ["v0"]],
+    ["keypad:C4", "esp:13", "#8f4814", ["v0"]],
+    ["lcd:GND", "esp:GND.1", "cyan", ["h0"]],
+    ["lcd:VCC", "esp:5V", "red", ["h0"]],
+    ["lcd:SDA", "esp:8", "violet", ["h0"]],
+    ["lcd:SCL", "esp:9", "violet", ["h0"]]
+  ],
+  "serialMonitor": { "convertEol": true, "display": "always" },
+  "dependencies": {}
+}
