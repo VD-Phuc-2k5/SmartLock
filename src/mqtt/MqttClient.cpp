@@ -1,21 +1,6 @@
 #include "MqttClient.h"
 
-namespace
-{
-    constexpr char WIFI_SSID[] = "Wokwi-GUEST";
-    constexpr char WIFI_PASSWORD[] = "";
-
-    constexpr char MQTT_BROKER[] = "host.wokwi.internal";
-    constexpr uint16_t MQTT_PORT = 1883;
-
-    constexpr char MQTT_TOPIC[] =
-        "smartlock/device/esp32-01/otp";
-
-    constexpr char MQTT_CLIENT_ID[] = "smartlock-esp32-01";
-
-    constexpr uint32_t WIFI_TIMEOUT_MS = 15000;
-    constexpr uint32_t RECONNECT_INTERVAL_MS = 5000;
-}
+#include <cstring>
 
 MqttClient::MqttClient()
     : mqttClient(wifiClient)
@@ -24,12 +9,12 @@ MqttClient::MqttClient()
 
 void MqttClient::begin()
 {
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    WiFi.begin(AppConfig::Wifi::SSID, AppConfig::Wifi::PASSWORD);
 
     uint32_t start = millis();
     while (WiFi.status() != WL_CONNECTED)
     {
-        if (millis() - start >= WIFI_TIMEOUT_MS)
+        if (millis() - start >= AppConfig::Wifi::TIMEOUT_MS)
         {
             Serial.println("Failed to connect to WiFi");
             return;
@@ -39,7 +24,7 @@ void MqttClient::begin()
 
     Serial.println("Connected to WiFi");
 
-    mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
+    mqttClient.setServer(AppConfig::Mqtt::BROKER, AppConfig::Mqtt::PORT);
     mqttClient.setCallback(
         [this](char *topic, byte *payload, unsigned int length)
         {
@@ -54,7 +39,7 @@ void MqttClient::loop()
     if (!mqttClient.connected())
     {
         uint32_t now = millis();
-        if (now - lastReconnectAttempt >= RECONNECT_INTERVAL_MS)
+        if (now - lastReconnectAttempt >= AppConfig::Mqtt::RECONNECT_INTERVAL_MS)
         {
             lastReconnectAttempt = now;
             connect();
@@ -68,10 +53,14 @@ void MqttClient::loop()
 void MqttClient::connect()
 {
     Serial.println("Connecting to MQTT broker...");
-    if (mqttClient.connect(MQTT_CLIENT_ID))
+    if (mqttClient.connect(AppConfig::Mqtt::CLIENT_ID))
     {
         Serial.println("Connected to MQTT broker");
-        mqttClient.subscribe(MQTT_TOPIC);
+
+        for (uint8_t i = 0; i < subscriptionCount; i++)
+        {
+            mqttClient.subscribe(subscriptions[i].topic);
+        }
     }
     else
     {
@@ -80,26 +69,34 @@ void MqttClient::connect()
     }
 }
 
+bool MqttClient::subscribe(const char *topic, MqttMessageHandler handler)
+{
+    if (subscriptionCount >= AppConfig::Mqtt::MAX_SUBSCRIPTIONS)
+    {
+        return false;
+    }
+
+    subscriptions[subscriptionCount] = {topic, handler};
+    subscriptionCount++;
+
+    if (mqttClient.connected())
+    {
+        mqttClient.subscribe(topic);
+    }
+
+    return true;
+}
+
 void MqttClient::onMessage(char *topic, byte *payload, unsigned int length)
 {
-    (void)topic;
-    unsigned int n = length < sizeof(lastMessage) - 1 ? length : sizeof(lastMessage) - 1;
-    memcpy(lastMessage, payload, n);
-    lastMessage[n] = '\0';
-    hasNewMessage = true;
-}
-
-bool MqttClient::hasMessage()
-{
-    return hasNewMessage;
-}
-
-const char *MqttClient::getMessage()
-{
-    return lastMessage;
-}
-
-void MqttClient::clearMessage()
-{
-    hasNewMessage = false;
+    for (uint8_t i = 0; i < subscriptionCount; i++)
+    {
+        if (std::strcmp(topic, subscriptions[i].topic) == 0)
+        {
+            subscriptions[i].handler(
+                reinterpret_cast<const char *>(payload),
+                length);
+            return;
+        }
+    }
 }
