@@ -8,6 +8,9 @@ import { SmtpMailer } from './mail/SmtpMailer.js';
 import { MqttNotifier } from './notify/MqttNotifier.js';
 import { EmailNotifier } from './notify/EmailNotifier.js';
 import { CompositeNotifier } from './notify/OtpNotifier.js';
+import { JsonFileCardStore } from './card/CardStore.js';
+import { CardService } from './card/CardService.js';
+import { Topics, extractDeviceId } from './topics.js';
 
 const generator = new RandomOtpGenerator(config.otp.length);
 const store = new InMemoryOtpStore();
@@ -20,7 +23,50 @@ const notifier = new CompositeNotifier([
     new EmailNotifier(mailer, config.email.subject),
 ]);
 
+const cardStore = new JsonFileCardStore(config.card.filePath);
+const cardService = new CardService(cardStore);
+
 await mqttClient.connect();
+
+mqttClient.subscribe(Topics.otpRequest);
+mqttClient.subscribe(Topics.cardEnroll);
+mqttClient.subscribe(Topics.cardVerify);
+
+mqttClient.onMessage((topic, message) => {
+    void handleMqttMessage(topic, message);
+});
+
+async function handleMqttMessage(topic: string, message: string): Promise<void> {
+    try {
+        const deviceId = extractDeviceId(topic);
+        if (!deviceId) {
+            return;
+        }
+
+        if (topic.endsWith('/otp/request')) {
+            const record = otpService.issue(deviceId, config.email.to);
+            await notifier.notify(record);
+            console.log(`[OTP] requested by ${deviceId}, sent to ${config.email.to}`);
+            return;
+        }
+
+        if (topic.endsWith('/card/enroll')) {
+            const result = await cardService.enroll(message);
+            mqttClient.publish(Topics.cardEnrollResult(deviceId), result);
+            console.log(`[CARD] enroll ${deviceId} uid=${message} -> ${result}`);
+            return;
+        }
+
+        if (topic.endsWith('/card/verify')) {
+            const valid = await cardService.verify(message);
+            mqttClient.publish(Topics.cardVerifyResult(deviceId), valid ? 'valid' : 'invalid');
+            console.log(`[CARD] verify ${deviceId} uid=${message} -> ${valid ? 'valid' : 'invalid'}`);
+            return;
+        }
+    } catch (err) {
+        console.error('[MQTT] handler error:', err);
+    }
+}
 
 function sendJson(res: http.ServerResponse, status: number, body: unknown): void {
     res.writeHead(status, { 'Content-Type': 'application/json' });
