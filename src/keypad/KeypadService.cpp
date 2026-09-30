@@ -1,4 +1,5 @@
 #include "KeypadService.h"
+#include "../config/PinConfig.h"
 
 namespace
 {
@@ -8,8 +9,19 @@ namespace
         {'7', '8', '9', 'C'},
         {'*', '0', '#', 'D'}};
 
-    byte rowPins[4] = {4, 5, 6, 7};
-    byte colPins[4] = {10, 11, 12, 13};
+    byte rowPins[4] = {
+        PinConfig::Keypad::R1,
+        PinConfig::Keypad::R2,
+        PinConfig::Keypad::R3,
+        PinConfig::Keypad::R4,
+    };
+
+    byte colPins[4] = {
+        PinConfig::Keypad::C1,
+        PinConfig::Keypad::C2,
+        PinConfig::Keypad::C3,
+        PinConfig::Keypad::C4,
+    };
 }
 
 KeypadService::KeypadService() : keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS) {}
