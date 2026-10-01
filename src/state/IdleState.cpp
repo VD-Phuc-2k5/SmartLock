@@ -52,7 +52,8 @@ void IdleState::onVerifyResult(LockController &ctx, bool valid)
     ctx.lcd.clear();
     if (valid)
     {
-        ctx.lcd.print("Access granted");
+        ctx.verifyingForAccess = true;
+        ctx.lcd.print("Waiting OTP...");
     }
     else
     {
