@@ -46,6 +46,16 @@ void LockController::onEnrollResult(bool ok)
     }
 }
 
+void LockController::onOtpReceived()
+{
+    if (verifyingForAccess && current == &idleState)
+    {
+        verifyingForAccess = false;
+        setState(&otpVerifyState);
+        otpVerifyState.setForAccess(true);
+    }
+}
+
 void LockController::resetInput()
 {
     inputLength = 0;

@@ -20,6 +20,7 @@ public:
     void onCard(const String &uid);
     void onVerifyResult(bool valid);
     void onEnrollResult(bool ok);
+    void onOtpReceived();
 
     void resetInput();
     void appendKey(char key);
@@ -32,6 +33,8 @@ public:
     IdleState idleState;
     OtpVerifyState otpVerifyState;
     EnrollState enrollState;
+
+    bool verifyingForAccess = false;
 
 private:
     IState *current = nullptr;
