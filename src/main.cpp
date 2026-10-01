@@ -28,6 +28,7 @@ void setup()
         [](const char *payload, unsigned int length)
         {
             otp.setOtp(payload, length);
+            controller.onOtpReceived();
         });
 
     mqtt.subscribe(

@@ -67,6 +67,16 @@ async function handleMqttMessage(topic: string, message: string): Promise<void> 
             const valid = await cardService.verify(message);
             mqttClient.publish(Topics.cardVerifyResult(deviceId), valid ? 'valid' : 'invalid');
             console.log(`[CARD] verify ${deviceId} uid=${message} -> ${valid ? 'valid' : 'invalid'}`);
+
+            if (valid) {
+                const card = await cardService.find(message);
+                const email = card?.email;
+                if (email) {
+                    const record = otpService.issue(deviceId, email);
+                    await notifier.notify(record);
+                    console.log(`[OTP] access OTP sent to ${email} for device=${deviceId}`);
+                }
+            }
             return;
         }
     } catch (err) {
