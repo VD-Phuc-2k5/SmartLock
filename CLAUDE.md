@@ -1,7 +1,7 @@
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **smart_lock** (106 symbols, 146 relationships, 0 execution flows).
+This project is indexed by GitNexus as **SmartLock** (456 symbols, 833 relationships, 16 execution flows).
 
 > Index stale? Run `node .gitnexus/run.cjs analyze --index-only` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? Bootstrap with `npx`, `bunx`, or `pnpm dlx` — e.g. `bunx gitnexus@latest analyze` (npm 11 npx crash; #1939).
 
@@ -25,10 +25,10 @@ This project is indexed by GitNexus as **smart_lock** (106 symbols, 146 relation
 
 | Resource | Use for |
 | --- | --- |
-| `gitnexus://repo/smart_lock/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/smart_lock/clusters` | All functional areas |
-| `gitnexus://repo/smart_lock/processes` | All execution flows |
-| `gitnexus://repo/smart_lock/process/{name}` | Step-by-step execution trace |
+| `gitnexus://repo/SmartLock/context` | Codebase overview, check index freshness |
+| `gitnexus://repo/SmartLock/clusters` | All functional areas |
+| `gitnexus://repo/SmartLock/processes` | All execution flows |
+| `gitnexus://repo/SmartLock/process/{name}` | Step-by-step execution trace |
 
 ## CLI
 
