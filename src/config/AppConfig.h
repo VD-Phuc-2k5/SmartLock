@@ -4,6 +4,8 @@
 
 namespace AppConfig
 {
+    constexpr int FAILURE_DELAY_MS = 500;
+
     namespace Wifi
     {
         constexpr char SSID[] = "Wokwi-GUEST";
@@ -18,6 +20,7 @@ namespace AppConfig
         constexpr char CLIENT_ID[] = "smartlock-esp32-01";
         constexpr uint32_t RECONNECT_INTERVAL_MS = 5000;
         constexpr uint8_t MAX_SUBSCRIPTIONS = 4;
+        constexpr int DELAY_MS = 500;
     }
 
     namespace Otp
@@ -25,6 +28,8 @@ namespace AppConfig
         constexpr uint8_t LENGTH = 6;
         constexpr uint32_t TTL_MS = 300000;
         constexpr uint8_t MAX_ATTEMPTS = 3;
+        constexpr int DELAY_MS = 500;
+        constexpr int FAILURE_DELAY_MS = 1500;
     }
 
     namespace Password
@@ -54,5 +59,14 @@ namespace AppConfig
         constexpr char CARD_VERIFY[] = "smartlock/device/esp32-01/card/verify";
         constexpr char CARD_ENROLL_RESULT[] = "smartlock/device/esp32-01/card/enroll/result";
         constexpr char CARD_VERIFY_RESULT[] = "smartlock/device/esp32-01/card/verify/result";
+    }
+
+    namespace Indicator
+    {
+        constexpr int BEEP_DURATION = 150;
+        constexpr int BEEP_INTERVAL = 150;
+        constexpr int LED_ON_DURATION = 1000;
+        constexpr int LED_OFF_DURATION = 500;
+        constexpr int LED_BLINK_COUNT = 3;
     }
 }
