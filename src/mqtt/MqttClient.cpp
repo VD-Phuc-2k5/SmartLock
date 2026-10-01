@@ -1,6 +1,7 @@
 #include "MqttClient.h"
 
 #include <cstring>
+#include "config/AppConfig.h"
 
 MqttClient::MqttClient()
     : mqttClient(wifiClient)
@@ -19,7 +20,7 @@ void MqttClient::begin()
             Serial.println("Failed to connect to WiFi");
             return;
         }
-        delay(500);
+        delay(AppConfig::Mqtt::DELAY_MS);
     }
 
     Serial.println("Connected to WiFi");

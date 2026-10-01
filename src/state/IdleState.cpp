@@ -1,6 +1,6 @@
 #include "IdleState.h"
 #include "LockController.h"
-#include "../config/AppConfig.h"
+#include "config/AppConfig.h"
 #include <cstring>
 
 void IdleState::onEnter(LockController &ctx)
@@ -58,6 +58,10 @@ void IdleState::onVerifyResult(LockController &ctx, bool valid)
     else
     {
         ctx.lcd.print("No info");
+        ctx.indicator.accessDenied();
+        delay(AppConfig::FAILURE_DELAY_MS);
+        ctx.lcd.clear();
+        ctx.lcd.print("Waiting ...");
     }
 }
 

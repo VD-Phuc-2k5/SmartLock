@@ -1,5 +1,6 @@
 #include "OtpVerifyState.h"
 #include "LockController.h"
+#include "config/AppConfig.h"
 
 void OtpVerifyState::setForAccess(bool value)
 {
@@ -36,7 +37,8 @@ void OtpVerifyState::onKey(LockController &ctx, char key)
                 forAccess = false;
                 ctx.lcd.clear();
                 ctx.lcd.print("Access granted");
-                delay(1500);
+                ctx.indicator.unlocked();
+                delay(AppConfig::Otp::DELAY_MS);
                 ctx.setState(&ctx.idleState);
             }
             else
@@ -49,7 +51,8 @@ void OtpVerifyState::onKey(LockController &ctx, char key)
             ctx.resetInput();
             ctx.lcd.clear();
             ctx.lcd.print("OTP INVALID");
-            delay(1500);
+            ctx.indicator.accessDenied();
+            delay(AppConfig::Otp::FAILURE_DELAY_MS);
             ctx.setState(&ctx.idleState);
         }
     }
