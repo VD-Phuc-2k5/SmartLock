@@ -1,4 +1,4 @@
-import type { CardStore } from './CardStore.js';
+import type { Card, CardStore } from './CardStore.js';
 
 export type EnrollResult = 'ok' | 'duplicate';
 
@@ -12,5 +12,13 @@ export class CardService {
 
     async verify(uid: string): Promise<boolean> {
         return this.store.contains(uid);
+    }
+
+    async list(): Promise<Card[]> {
+        return this.store.list();
+    }
+
+    async update(cards: Card[]): Promise<void> {
+        await this.store.replaceAll(cards);
     }
 }
