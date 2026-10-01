@@ -53,7 +53,9 @@ void OtpVerifyState::onKey(LockController &ctx, char key)
             ctx.lcd.print("OTP INVALID");
             ctx.indicator.accessDenied();
             delay(AppConfig::Otp::FAILURE_DELAY_MS);
-            ctx.setState(&ctx.idleState);
+
+            ctx.lcd.clear();
+            ctx.lcd.print("Enter OTP");
         }
     }
 }
