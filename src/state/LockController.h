@@ -9,11 +9,12 @@
 #include "../mqtt/IMqttClient.h"
 #include "../otp/IOtpService.h"
 #include "../config/AppConfig.h"
+#include "../indicator/AccessIndicator.h"
 
 class LockController
 {
 public:
-    LockController(ILcd &lcd, IMqttClient &mqtt, IOtpService &otp);
+    LockController(ILcd &lcd, IMqttClient &mqtt, IOtpService &otp, AccessIndicator &indicator);
 
     void setState(IState *state);
     void onKey(char key);
@@ -29,6 +30,7 @@ public:
     ILcd &lcd;
     IMqttClient &mqtt;
     IOtpService &otp;
+    AccessIndicator &indicator;
 
     IdleState idleState;
     OtpVerifyState otpVerifyState;

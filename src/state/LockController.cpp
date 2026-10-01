@@ -1,7 +1,7 @@
 #include "LockController.h"
 
-LockController::LockController(ILcd &lcd, IMqttClient &mqtt, IOtpService &otp)
-    : lcd(lcd), mqtt(mqtt), otp(otp)
+LockController::LockController(ILcd &lcd, IMqttClient &mqtt, IOtpService &otp, AccessIndicator &indicator)
+    : lcd(lcd), mqtt(mqtt), otp(otp), indicator(indicator)
 {
 }
 
