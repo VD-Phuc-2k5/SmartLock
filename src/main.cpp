@@ -25,12 +25,12 @@ void setup()
     Serial.begin(115200);
     keypad.begin();
     lcd.begin();
-    controller.setState(&controller.idleState);
 
     mqtt.begin();
     rfid.begin();
     indicator.begin();
     doorLock.begin();
+    controller.setState(&controller.idleState);
 
     mqtt.subscribe(
         AppConfig::Topics::OTP,
