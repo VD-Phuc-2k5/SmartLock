@@ -1,4 +1,4 @@
-﻿# SmartLock
+# SmartLock
 
 SmartLock is a connected door-lock system built from ESP32-S3 firmware, an MQTT/OTP/card service, and a Next.js web client.
 
@@ -125,13 +125,23 @@ pio run
 
 The firmware image is generated at `.pio/build/esp32-s3-devkitc-1/firmware.bin`.
 
-For Wokwi, use:
+### Wokwi Gateway
+
+This repository includes `wokwigw-linux`, the Wokwi IoT Gateway used to expose the simulated ESP32 to local services. It listens on `localhost:9011` by default, matching the `net.gateway` value in `wokwi.toml`.
+
+Start it from the repository root in a separate terminal:
 
 ```bash
-wokwi-cli
+./wokwigw-linux
 ```
 
-or open the project in Wokwi using the paths configured in `wokwi.toml`.
+The binary supports `--listenPort` when a different local port is required:
+
+```bash
+./wokwigw-linux --listenPort 9011
+```
+
+Run the Wokwi simulation using the paths configured in `wokwi.toml`. The gateway must be running when the simulated firmware needs to reach the local MQTT broker through `host.wokwi.internal`.
 
 The main firmware initialization sequence is:
 
