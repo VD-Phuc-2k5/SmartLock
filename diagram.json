@@ -81,6 +81,14 @@
       "top": 232.8,
       "left": 616.2,
       "attrs": { "volume": "0.1" }
+    },
+    {
+      "type": "wokwi-servo",
+      "id": "servo1",
+      "top": 352.4,
+      "left": -102.8,
+      "rotate": 180,
+      "attrs": {}
     }
   ],
   "connections": [
@@ -112,7 +120,10 @@
     ["r2:1", "led1:A", "green", ["v0"]],
     ["led1:C", "esp:GND.2", "green", ["v0"]],
     ["esp:42", "bz1:1", "green", ["h0"]],
-    ["bz1:2", "esp:GND.4", "green", ["v0"]]
+    ["bz1:2", "esp:GND.4", "green", ["v0"]],
+    ["servo1:PWM", "esp:14", "green", ["h0"]],
+    ["servo1:V+", "esp:5V", "green", ["h0"]],
+    ["servo1:GND", "esp:GND.1", "black", ["h0"]]
   ],
   "serialMonitor": { "convertEol": true, "display": "always" },
   "dependencies": {}
