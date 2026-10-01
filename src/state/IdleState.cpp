@@ -5,6 +5,7 @@
 
 void IdleState::onEnter(LockController &ctx)
 {
+    ctx.doorLock.lock();
     ctx.indicator.locked();
     ctx.lcd.clear();
     ctx.lcd.print("Waiting ...");
