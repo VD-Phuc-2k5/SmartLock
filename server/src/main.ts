@@ -9,7 +9,9 @@ import { MqttNotifier } from './notify/MqttNotifier.js';
 import { EmailNotifier } from './notify/EmailNotifier.js';
 import { CompositeNotifier } from './notify/OtpNotifier.js';
 import { JsonFileCardStore } from './card/CardStore.js';
+import type { Card } from './card/CardStore.js';
 import { CardService } from './card/CardService.js';
+import { CardEventBus } from './card/CardEventBus.js';
 import { Topics, extractDeviceId } from './topics.js';
 
 const generator = new RandomOtpGenerator(config.otp.length);
@@ -25,6 +27,7 @@ const notifier = new CompositeNotifier([
 
 const cardStore = new JsonFileCardStore(config.card.filePath);
 const cardService = new CardService(cardStore);
+const cardEvents = new CardEventBus();
 
 await mqttClient.connect();
 
@@ -54,6 +57,9 @@ async function handleMqttMessage(topic: string, message: string): Promise<void> 
             const result = await cardService.enroll(message);
             mqttClient.publish(Topics.cardEnrollResult(deviceId), result);
             console.log(`[CARD] enroll ${deviceId} uid=${message} -> ${result}`);
+            if (result === 'ok') {
+                cardEvents.publish(await cardService.list());
+            }
             return;
         }
 
@@ -68,8 +74,14 @@ async function handleMqttMessage(topic: string, message: string): Promise<void> 
     }
 }
 
+const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+};
+
 function sendJson(res: http.ServerResponse, status: number, body: unknown): void {
-    res.writeHead(status, { 'Content-Type': 'application/json' });
+    res.writeHead(status, { 'Content-Type': 'application/json', ...corsHeaders });
     res.end(JSON.stringify(body));
 }
 
@@ -89,7 +101,87 @@ function parseJson(body: string): Record<string, unknown> {
     return JSON.parse(body);
 }
 
+function parseCards(value: unknown): Card[] | null {
+    if (!Array.isArray(value)) {
+        return null;
+    }
+
+    const cards: Card[] = [];
+    for (const item of value) {
+        if (!item || typeof item !== 'object') {
+            return null;
+        }
+        const { uid, email } = item as { uid?: unknown; email?: unknown };
+        if (typeof uid !== 'string' || !uid) {
+            return null;
+        }
+        if (email !== undefined && typeof email !== 'string') {
+            return null;
+        }
+        cards.push({ uid, email: email ?? '' });
+    }
+    return cards;
+}
+
 const server = http.createServer(async (req, res) => {
+    if (req.method === 'OPTIONS') {
+        res.writeHead(204, corsHeaders);
+        res.end();
+        return;
+    }
+
+    if (req.method === 'GET' && req.url === '/api/cards') {
+        const cards = await cardService.list();
+        sendJson(res, 200, { cards });
+        return;
+    }
+
+    if (req.method === 'GET' && req.url === '/api/cards/events') {
+        res.writeHead(200, {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            ...corsHeaders,
+        });
+        res.write(': connected\n\n');
+
+        const send = (cards: Card[]) => {
+            res.write(`data: ${JSON.stringify({ cards })}\n\n`);
+        };
+
+        send(await cardService.list());
+
+        const unsubscribe = cardEvents.subscribe(send);
+        req.on('close', () => {
+            unsubscribe();
+        });
+        return;
+    }
+
+    if (req.method === 'PUT' && req.url === '/api/cards') {
+        const body = await readBody(req);
+
+        let payload: unknown;
+        try {
+            payload = parseJson(body);
+        } catch {
+            sendJson(res, 400, { error: 'invalid JSON body' });
+            return;
+        }
+
+        const cards = parseCards((payload as { cards?: unknown }).cards);
+        if (!cards) {
+            sendJson(res, 400, { error: 'cards must be an array of { uid, email }' });
+            return;
+        }
+
+        await cardService.update(cards);
+        console.log(`[CARD] updated ${cards.length} cards`);
+        cardEvents.publish(await cardService.list());
+        sendJson(res, 200, { cards });
+        return;
+    }
+
     if (req.method === 'POST' && req.url === '/api/otp') {
         const body = await readBody(req);
 
