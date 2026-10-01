@@ -6,6 +6,7 @@
 #include "mqtt/MqttClient.h"
 #include "otp/OtpService.h"
 #include "rfid/RfidService.h"
+#include "indicator/AccessIndicator.h"
 #include "state/LockController.h"
 
 KeypadService keypad;
@@ -13,7 +14,9 @@ LcdService lcd;
 MqttClient mqtt;
 OtpService otp;
 RfidService rfid;
-LockController controller(lcd, mqtt, otp);
+AccessIndicator indicator;
+
+LockController controller(lcd, mqtt, otp, indicator);
 
 void setup()
 {
@@ -22,6 +25,7 @@ void setup()
     lcd.begin();
     mqtt.begin();
     rfid.begin();
+    indicator.begin();
 
     mqtt.subscribe(
         AppConfig::Topics::OTP,
