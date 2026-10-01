@@ -38,4 +38,9 @@ namespace PinConfig
         constexpr uint8_t RED_LED = 2;
         constexpr uint8_t BUZZER = 42;
     }
+
+    namespace Lock
+    {
+        constexpr uint8_t SERVO = 14;
+    }
 }
