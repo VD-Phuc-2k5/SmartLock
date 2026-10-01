@@ -38,6 +38,7 @@ void OtpVerifyState::onKey(LockController &ctx, char key)
                 ctx.lcd.clear();
                 ctx.lcd.print("Access granted");
                 ctx.indicator.unlocked();
+                ctx.doorLock.unlock();
                 delay(AppConfig::Otp::DELAY_MS);
                 ctx.setState(&ctx.idleState);
             }
