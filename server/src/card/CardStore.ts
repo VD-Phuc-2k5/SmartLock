@@ -9,6 +9,7 @@ export interface Card {
 export interface CardStore {
     add(uid: string): Promise<boolean>;
     contains(uid: string): Promise<boolean>;
+    find(uid: string): Promise<Card | undefined>;
     list(): Promise<Card[]>;
     replaceAll(cards: Card[]): Promise<void>;
 }
@@ -61,6 +62,11 @@ export class JsonFileCardStore implements CardStore {
     async contains(uid: string): Promise<boolean> {
         const cards = await this.read();
         return cards.some((card) => card.uid === uid);
+    }
+
+    async find(uid: string): Promise<Card | undefined> {
+        const cards = await this.read();
+        return cards.find((card) => card.uid === uid);
     }
 
     async list(): Promise<Card[]> {

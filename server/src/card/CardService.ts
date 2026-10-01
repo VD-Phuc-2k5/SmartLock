@@ -14,6 +14,10 @@ export class CardService {
         return this.store.contains(uid);
     }
 
+    async find(uid: string): Promise<Card | undefined> {
+        return this.store.find(uid);
+    }
+
     async list(): Promise<Card[]> {
         return this.store.list();
     }
