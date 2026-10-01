@@ -1,6 +1,11 @@
 #include "OtpVerifyState.h"
 #include "LockController.h"
 
+void OtpVerifyState::setForAccess(bool value)
+{
+    forAccess = value;
+}
+
 void OtpVerifyState::onEnter(LockController &ctx)
 {
     ctx.lcd.clear();
@@ -26,7 +31,18 @@ void OtpVerifyState::onKey(LockController &ctx, char key)
         if (ctx.otp.verify(ctx.getInput()))
         {
             ctx.resetInput();
-            ctx.setState(&ctx.enrollState);
+            if (forAccess)
+            {
+                forAccess = false;
+                ctx.lcd.clear();
+                ctx.lcd.print("Access granted");
+                delay(1500);
+                ctx.setState(&ctx.idleState);
+            }
+            else
+            {
+                ctx.setState(&ctx.enrollState);
+            }
         }
         else
         {
