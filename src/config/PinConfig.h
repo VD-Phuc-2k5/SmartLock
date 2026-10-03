@@ -28,7 +28,7 @@ namespace PinConfig
         constexpr uint8_t SS = 40;
         constexpr uint8_t RST = 35;
         constexpr uint8_t SCK = 39;
-        constexpr uint8_t MISO = 36;
+        constexpr uint8_t MISO = 37;
         constexpr uint8_t MOSI = 38;
     }
 
@@ -36,11 +36,11 @@ namespace PinConfig
     {
         constexpr uint8_t GREEN_LED = 1;
         constexpr uint8_t RED_LED = 2;
-        constexpr uint8_t BUZZER = 42;
+        constexpr uint8_t BUZZER = 21;
     }
 
     namespace Lock
     {
-        constexpr uint8_t SERVO = 14;
+        constexpr uint8_t SERVO = 15;
     }
 }
