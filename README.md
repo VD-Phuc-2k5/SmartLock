@@ -74,6 +74,9 @@ The keypad, LEDs, buzzer, and servo are controlled directly through GPIO. The LC
 
 ![LEDs and buzzer](assets/led-buzzer.png)
 
+### Test Board
+![Test board](assets/testboard.png)
+
 ## MQTT topics
 
 The default device ID is `esp32-01`. The topic hierarchy is:
