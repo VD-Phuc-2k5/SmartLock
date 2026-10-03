@@ -1,7 +1,10 @@
 #include <Arduino.h>
 #include <cstring>
+#include <WiFi.h>
+
 #include "config/AppConfig.h"
 #include "config/ConfigManager.h"
+
 #include "keypad/KeypadService.h"
 #include "lcd/LcdService.h"
 #include "mqtt/MqttClient.h"
@@ -12,15 +15,22 @@
 #include "door/DoorLock.h"
 #include "web/WebConfigService.h"
 
-ConfigManager configManager;
+// ============================================================
+// GLOBAL SERVICES
+// ============================================================
+
+ConfigManager config;
+
 KeypadService keypad;
 LcdService lcd;
-WebConfigService webConfig(configManager);
-MqttClient mqtt(configManager);
+
+MqttClient mqtt(config);
+
 OtpService otp;
 RfidService rfid;
 AccessIndicator indicator;
 DoorLock doorLock;
+
 LockController controller(
     lcd,
     mqtt,
@@ -28,58 +38,158 @@ LockController controller(
     indicator,
     doorLock);
 
+WebConfigService webConfig(config);
+
+// ============================================================
+// WIFI
+// ============================================================
+
+bool connectWifi()
+{
+    const NetworkConfig &networkConfig = config.get();
+
+    Serial.println("[WIFI] Connecting...");
+    Serial.print("[WIFI] SSID: ");
+    Serial.println(networkConfig.ssid);
+
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(
+        networkConfig.ssid.c_str(),
+        networkConfig.password.c_str());
+
+    unsigned long start = millis();
+
+    while (
+        WiFi.status() != WL_CONNECTED &&
+        millis() - start < AppConfig::Wifi::TIMEOUT_MS)
+    {
+        delay(500);
+        Serial.print(".");
+    }
+
+    Serial.println();
+
+    if (WiFi.status() != WL_CONNECTED)
+    {
+        Serial.println("[WIFI] Connection FAILED");
+        return false;
+    }
+
+    Serial.println("[WIFI] Connected");
+
+    Serial.print("[WIFI] IP: ");
+    Serial.println(WiFi.localIP());
+
+    return true;
+}
+
+// ============================================================
+// SETUP
+// ============================================================
+
 void setup()
 {
     Serial.begin(115200);
-    delay(1000);
+
+    delay(5000);
 
     Serial.println();
-    Serial.println("========== BOOT ==========");
+    Serial.println("================================");
+    Serial.println("       SMART LOCK BOOT");
+    Serial.println("================================");
 
-    configManager.begin();
+    // --------------------------------------------------------
+    // CONFIG
+    // --------------------------------------------------------
 
-    if (!configManager.hasConfig())
+    Serial.println("[SETUP] 1. ConfigManager");
+
+    bool hasConfig = config.begin();
+
+    if (hasConfig)
     {
-        Serial.println("[MAIN] No network configuration");
-        Serial.println("[MAIN] Starting configuration portal...");
+        Serial.println("[SETUP] Network configuration loaded");
 
-        if (!webConfig.begin())
-        {
-            Serial.println("[MAIN] Failed to start web config");
-            return;
-        }
+        Serial.print("[SETUP] SSID: ");
+        Serial.println(config.get().ssid);
 
-        Serial.println("[MAIN] =============================");
-        Serial.println("[MAIN] Connect to Wi-Fi:");
-        Serial.println("[MAIN]     SmartLock-Setup");
-        Serial.println("[MAIN] Then open:");
-        Serial.println("[MAIN]     http://192.168.4.1");
-        Serial.println("[MAIN] =============================");
+        Serial.print("[SETUP] MQTT Host: ");
+        Serial.println(config.get().mqttHost);
 
-        return;
+        Serial.print("[SETUP] MQTT Port: ");
+        Serial.println(config.get().mqttPort);
+    }
+    else
+    {
+        Serial.println("[SETUP] No valid network configuration");
     }
 
-    Serial.println("[MAIN] Network configuration found");
+    // --------------------------------------------------------
+    // KEYPAD
+    // --------------------------------------------------------
 
-    const NetworkConfig &networkConfig = configManager.get();
-
-    Serial.print("[MAIN] Wi-Fi SSID: ");
-    Serial.println(networkConfig.ssid);
-
-    Serial.print("[MAIN] MQTT Broker: ");
-    Serial.print(networkConfig.mqttHost);
-    Serial.print(":");
-    Serial.println(networkConfig.mqttPort);
+    Serial.println("[SETUP] 2. Keypad");
 
     keypad.begin();
+
+    Serial.println("[SETUP] Keypad OK");
+
+    // --------------------------------------------------------
+    // LCD
+    // --------------------------------------------------------
+
+    Serial.println("[SETUP] 3. LCD");
+
     lcd.begin();
 
+    Serial.println("[SETUP] LCD OK");
+
+    // --------------------------------------------------------
+    // RFID
+    // --------------------------------------------------------
+
+    Serial.println("[SETUP] 4. RFID");
+
     rfid.begin();
+
+    Serial.println("[SETUP] RFID OK");
+
+    // --------------------------------------------------------
+    // INDICATOR
+    // --------------------------------------------------------
+
+    Serial.println("[SETUP] 5. Indicator");
+
     indicator.begin();
+
+    Serial.println("[SETUP] Indicator OK");
+
+    // --------------------------------------------------------
+    // DOOR LOCK
+    // --------------------------------------------------------
+
+    Serial.println("[SETUP] 6. DoorLock");
+
     doorLock.begin();
+
+    Serial.println("[SETUP] DoorLock OK");
+
+    // --------------------------------------------------------
+    // CONTROLLER
+    // --------------------------------------------------------
+
+    Serial.println("[SETUP] 7. LockController");
 
     controller.setState(
         &controller.idleState);
+
+    Serial.println("[SETUP] LockController OK");
+
+    // --------------------------------------------------------
+    // MQTT SUBSCRIPTIONS
+    // --------------------------------------------------------
+
+    Serial.println("[SETUP] 8. MQTT subscriptions");
 
     mqtt.subscribe(
         AppConfig::Topics::OTP,
@@ -88,6 +198,8 @@ void setup()
             otp.setOtp(payload, length);
             controller.onOtpReceived();
         });
+
+    Serial.println("[SETUP] OTP subscription OK");
 
     mqtt.subscribe(
         AppConfig::Topics::CARD_VERIFY_RESULT,
@@ -103,6 +215,8 @@ void setup()
             controller.onVerifyResult(valid);
         });
 
+    Serial.println("[SETUP] Card verify subscription OK");
+
     mqtt.subscribe(
         AppConfig::Topics::CARD_ENROLL_RESULT,
         [](const char *payload, unsigned int length)
@@ -117,14 +231,87 @@ void setup()
             controller.onEnrollResult(ok);
         });
 
+    Serial.println("[SETUP] Card enroll subscription OK");
+
+    // --------------------------------------------------------
+    // NO CONFIG -> WEB CONFIGURATION MODE
+    // --------------------------------------------------------
+
+    if (!hasConfig)
+    {
+        Serial.println();
+        Serial.println("================================");
+        Serial.println("     CONFIGURATION MODE");
+        Serial.println("================================");
+
+        Serial.println("[SETUP] Starting WebConfigService...");
+
+        if (!webConfig.begin())
+        {
+            Serial.println("[SETUP] WebConfigService FAILED");
+        }
+        else
+        {
+            Serial.println("[SETUP] WebConfigService OK");
+
+            Serial.println();
+            Serial.println("Connect to Wi-Fi:");
+            Serial.println("SSID: SmartLock-Setup");
+            Serial.println("Open: http://192.168.4.1");
+            Serial.println();
+        }
+
+        return;
+    }
+
+    // --------------------------------------------------------
+    // WIFI
+    // --------------------------------------------------------
+
+    Serial.println("[SETUP] 9. WiFi");
+
+    if (!connectWifi())
+    {
+        Serial.println(
+            "[SETUP] WiFi failed");
+
+        Serial.println(
+            "[SETUP] Starting WebConfigService...");
+
+        webConfig.begin();
+
+        return;
+    }
+
+    Serial.println("[SETUP] WiFi OK");
+
+    // --------------------------------------------------------
+    // MQTT
+    // --------------------------------------------------------
+
+    Serial.println("[SETUP] 10. MQTT begin");
+
     mqtt.begin();
 
-    Serial.println("[MAIN] Smart Lock started");
+    Serial.println("[SETUP] MQTT begin returned");
+
+    // --------------------------------------------------------
+    // SETUP FINISHED
+    // --------------------------------------------------------
+
+    Serial.println();
+    Serial.println("================================");
+    Serial.println("   [MAIN] Smart Lock started");
+    Serial.println("================================");
 }
+
+// ============================================================
+// LOOP
+// ============================================================
 
 void loop()
 {
-    if (!configManager.hasConfig())
+    if (!config.hasConfig())
     {
         webConfig.handleClient();
         delay(2);
@@ -138,7 +325,7 @@ void loop()
     {
         String uid = rfid.readUid();
 
-        Serial.print("RFID UID: ");
+        Serial.print("[RFID] UID: ");
         Serial.println(uid);
 
         controller.onCard(uid);
@@ -147,9 +334,6 @@ void loop()
     char key = keypad.readkey();
     if (key != NO_KEY)
     {
-        Serial.print("Keypad key: ");
-        Serial.println(key);
-
         controller.onKey(key);
     }
 }
