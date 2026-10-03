@@ -65,7 +65,7 @@ void loop()
     {
         String uid = rfid.readUid();
 
-        Serial.print("RFID UID: ");
+        Serial.println("RFID UID: ");
         Serial.println(uid);
 
         controller.onCard(uid);
@@ -74,6 +74,8 @@ void loop()
     char key = keypad.readkey();
     if (key != NO_KEY)
     {
+        Serial.println("Keypad key: ");
+        Serial.println(key);
         controller.onKey(key);
     }
 }

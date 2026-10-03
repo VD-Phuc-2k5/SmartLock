@@ -5,10 +5,10 @@
 namespace
 {
     char keys[AppConfig::Keypad::ROWS][AppConfig::Keypad::COLS] = {
-        {'1', '2', '3', 'A'},
-        {'4', '5', '6', 'B'},
-        {'7', '8', '9', 'C'},
-        {'*', '0', '#', 'D'}};
+        {'A', 'B', 'C', 'D'},
+        {'3', '6', '9', '#'},
+        {'2', '5', '8', '0'},
+        {'1', '4', '7', '*'}};
 
     byte rowPins[AppConfig::Keypad::ROWS] = {
         PinConfig::Keypad::R1,
