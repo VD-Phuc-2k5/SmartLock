@@ -1,35 +1,65 @@
 #include "MqttClient.h"
-
 #include <cstring>
-#include "config/AppConfig.h"
 
-MqttClient::MqttClient()
-    : mqttClient(wifiClient)
+MqttClient::MqttClient(
+    ConfigManager &manager)
+    : configManager(manager),
+      mqttClient(wifiClient)
 {
 }
 
 void MqttClient::begin()
 {
-    WiFi.begin(AppConfig::Wifi::SSID, AppConfig::Wifi::PASSWORD);
-
-    uint32_t start = millis();
-    while (WiFi.status() != WL_CONNECTED)
+    if (!configManager.hasConfig())
     {
-        if (millis() - start >= AppConfig::Wifi::TIMEOUT_MS)
-        {
-            Serial.println("Failed to connect to WiFi");
-            return;
-        }
-        delay(AppConfig::Mqtt::DELAY_MS);
+        Serial.println(
+            "[MQTT] No network configuration");
+
+        return;
     }
 
-    Serial.println("Connected to WiFi");
+    const NetworkConfig &config =
+        configManager.get();
 
-    mqttClient.setServer(AppConfig::Mqtt::BROKER, AppConfig::Mqtt::PORT);
+    if (WiFi.status() != WL_CONNECTED)
+    {
+        Serial.println(
+            "[MQTT] WiFi is not connected");
+
+        return;
+    }
+
+    Serial.println(
+        "Connected to WiFi");
+
+    Serial.print("ESP32 IP: ");
+    Serial.println(
+        WiFi.localIP());
+
+    Serial.print("Gateway: ");
+    Serial.println(
+        WiFi.gatewayIP());
+
+    Serial.print("MQTT Broker: ");
+    Serial.print(config.mqttHost);
+
+    Serial.print(":");
+    Serial.println(config.mqttPort);
+
+    mqttClient.setServer(
+        config.mqttHost.c_str(),
+        config.mqttPort);
+
     mqttClient.setCallback(
-        [this](char *topic, byte *payload, unsigned int length)
+        [this](
+            char *topic,
+            byte *payload,
+            unsigned int length)
         {
-            onMessage(topic, payload, length);
+            onMessage(
+                topic,
+                payload,
+                length);
         });
 
     connect();
@@ -37,14 +67,29 @@ void MqttClient::begin()
 
 void MqttClient::loop()
 {
+    if (!configManager.hasConfig())
+    {
+        return;
+    }
+
+    if (WiFi.status() != WL_CONNECTED)
+    {
+        return;
+    }
+
     if (!mqttClient.connected())
     {
         uint32_t now = millis();
-        if (now - lastReconnectAttempt >= AppConfig::Mqtt::RECONNECT_INTERVAL_MS)
+
+        if (
+            now - lastReconnectAttempt >=
+            AppConfig::Mqtt::RECONNECT_INTERVAL_MS)
         {
             lastReconnectAttempt = now;
+
             connect();
         }
+
         return;
     }
 
@@ -53,31 +98,49 @@ void MqttClient::loop()
 
 void MqttClient::connect()
 {
-    Serial.println("Connecting to MQTT broker...");
-    if (mqttClient.connect(AppConfig::Mqtt::CLIENT_ID))
-    {
-        Serial.println("Connected to MQTT broker");
+    Serial.println(
+        "Connecting to MQTT broker...");
 
-        for (uint8_t i = 0; i < subscriptionCount; i++)
+    if (
+        mqttClient.connect(
+            AppConfig::Mqtt::CLIENT_ID))
+    {
+        Serial.println(
+            "Connected to MQTT broker");
+
+        for (
+            uint8_t i = 0;
+            i < subscriptionCount;
+            i++)
         {
-            mqttClient.subscribe(subscriptions[i].topic);
+            mqttClient.subscribe(
+                subscriptions[i].topic);
         }
     }
     else
     {
-        Serial.print("Failed to connect to MQTT broker, rc=");
-        Serial.print(mqttClient.state());
+        Serial.print(
+            "Failed to connect to MQTT broker, rc=");
+
+        Serial.println(
+            mqttClient.state());
     }
 }
 
-bool MqttClient::subscribe(const char *topic, MqttMessageHandler handler)
+bool MqttClient::subscribe(
+    const char *topic,
+    MqttMessageHandler handler)
 {
-    if (subscriptionCount >= AppConfig::Mqtt::MAX_SUBSCRIPTIONS)
+    if (
+        subscriptionCount >=
+        AppConfig::Mqtt::MAX_SUBSCRIPTIONS)
     {
         return false;
     }
 
-    subscriptions[subscriptionCount] = {topic, handler};
+    subscriptions[subscriptionCount] =
+        {topic, handler};
+
     subscriptionCount++;
 
     if (mqttClient.connected())
@@ -88,25 +151,40 @@ bool MqttClient::subscribe(const char *topic, MqttMessageHandler handler)
     return true;
 }
 
-bool MqttClient::publish(const char *topic, const char *message)
+bool MqttClient::publish(
+    const char *topic,
+    const char *message)
 {
     if (!mqttClient.connected())
     {
         return false;
     }
 
-    return mqttClient.publish(topic, message);
+    return mqttClient.publish(
+        topic,
+        message);
 }
 
-void MqttClient::onMessage(char *topic, byte *payload, unsigned int length)
+void MqttClient::onMessage(
+    char *topic,
+    byte *payload,
+    unsigned int length)
 {
-    for (uint8_t i = 0; i < subscriptionCount; i++)
+    for (
+        uint8_t i = 0;
+        i < subscriptionCount;
+        i++)
     {
-        if (std::strcmp(topic, subscriptions[i].topic) == 0)
+        if (
+            std::strcmp(
+                topic,
+                subscriptions[i].topic) == 0)
         {
             subscriptions[i].handler(
-                reinterpret_cast<const char *>(payload),
+                reinterpret_cast<const char *>(
+                    payload),
                 length);
+
             return;
         }
     }
