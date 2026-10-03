@@ -9,7 +9,9 @@ struct NetworkConfig
     String ssid;
     String password;
     String mqttHost;
-    uint16_t mqttPort = AppConfig::Mqtt::PORT;
+
+    uint16_t mqttPort =
+        AppConfig::Mqtt::PORT;
 
     bool isValid() const
     {

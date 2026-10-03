@@ -9,6 +9,7 @@ private:
     ConfigManager &configManager;
     WebServer server;
 
+    void handleRoot();
     void handleSave();
     void handleReset();
 

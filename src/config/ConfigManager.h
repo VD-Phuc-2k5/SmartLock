@@ -1,7 +1,7 @@
 #pragma once
 
-#include "NetworkConfig.h"
 #include <Preferences.h>
+#include "NetworkConfig.h"
 
 class ConfigManager
 {
