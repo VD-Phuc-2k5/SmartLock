@@ -8,14 +8,13 @@ namespace AppConfig
 
     namespace Wifi
     {
-        constexpr char SSID[] = "Wokwi-GUEST";
-        constexpr char PASSWORD[] = "";
         constexpr uint32_t TIMEOUT_MS = 15000;
     }
 
     namespace Mqtt
     {
-        constexpr char BROKER[] = "host.wokwi.internal";
+        // constexpr char BROKER[] = "host.wokwi.internal";
+        constexpr char BROKER[] = "192.168.1.105";
         constexpr uint16_t PORT = 1883;
         constexpr char CLIENT_ID[] = "smartlock-esp32-01";
         constexpr uint32_t RECONNECT_INTERVAL_MS = 5000;
