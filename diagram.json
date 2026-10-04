@@ -83,14 +83,6 @@
       "top": 213.6,
       "left": 241.8,
       "attrs": { "volume": "0.1" }
-    },
-    {
-      "type": "wokwi-servo",
-      "id": "servo1",
-      "top": -166,
-      "left": -582.8,
-      "rotate": 180,
-      "attrs": {}
     }
   ],
   "connections": [
@@ -151,13 +143,7 @@
     ["esp:21", "bb2:32b.j", "green", ["h0"]],
     ["bz1:1", "bb2:32b.i", "green", ["v0"]],
     ["bz1:2", "bb2:bn.26", "green", ["v0"]],
-    ["servo1:GND", "bb1:25b.h", "", ["$bb"]],
-    ["servo1:V+", "bb1:24b.h", "", ["$bb"]],
-    ["servo1:PWM", "bb1:23b.h", "", ["$bb"]],
-    ["servo1:GND", "bb1:tn.20", "black", ["h0"]],
-    ["servo1:V+", "bb1:tp.19", "green", ["h0"]],
-    ["esp:15", "bb1:51t.d", "green", ["h0"]],
-    ["servo1:PWM", "bb1:51t.e", "green", ["h0"]]
+    ["servo1:V+", "bb1:tp.19", "green", ["h0"]]
   ],
   "serialMonitor": { "convertEol": true, "display": "always" },
   "dependencies": {}
