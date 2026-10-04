@@ -14,7 +14,8 @@ private:
 
 public:
     void setOtp(const char *otp, unsigned int length) override;
-    bool verify(const char *input) override;
+    VerifyResult verify(const char *input) override;
     bool isExpired() const override;
+    bool hasExceededMaxAttempts() const override;
     void clear() override;
 };
