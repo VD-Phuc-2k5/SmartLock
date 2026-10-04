@@ -42,3 +42,8 @@ void EnrollState::onEnrollResult(LockController &ctx, bool ok)
         ctx.lcd.print("Duplicate");
     }
 }
+
+void EnrollState::onOtpReceived(LockController &ctx)
+{
+    (void)ctx;
+}

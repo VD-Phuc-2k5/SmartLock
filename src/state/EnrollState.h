@@ -10,4 +10,5 @@ public:
     void onCard(LockController &ctx, const String &uid) override;
     void onVerifyResult(LockController &ctx, bool valid) override;
     void onEnrollResult(LockController &ctx, bool ok) override;
+    void onOtpReceived(LockController &ctx) override;
 };
