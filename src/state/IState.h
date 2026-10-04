@@ -14,4 +14,5 @@ public:
     virtual void onCard(LockController &ctx, const String &uid) = 0;
     virtual void onVerifyResult(LockController &ctx, bool valid) = 0;
     virtual void onEnrollResult(LockController &ctx, bool ok) = 0;
+    virtual void onOtpReceived(LockController &ctx) = 0;
 };
