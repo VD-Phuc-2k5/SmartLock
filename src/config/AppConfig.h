@@ -62,9 +62,9 @@ namespace AppConfig
 
     namespace Indicator
     {
-        constexpr unsigned long BEEP_DURATION = 150;
-        constexpr unsigned long BEEP_INTERVAL = 150;
-        constexpr unsigned long LED_ON_DURATION = 1000;
+        constexpr unsigned long BEEP_DURATION = 50;
+        constexpr unsigned long BEEP_INTERVAL = 50;
+        constexpr unsigned long LED_ON_DURATION = 500;
         constexpr unsigned long LED_OFF_DURATION = 500;
         constexpr int LED_BLINK_COUNT = 3;
     }

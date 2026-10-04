@@ -312,9 +312,11 @@ bool WebConfigService::begin()
 {
     Serial.println("[WEB] ===== BEGIN START =====");
 
-    WiFi.mode(WIFI_AP);
+    // Keep the setup AP available even when the device is also connected
+    // to the configured Wi-Fi network.
+    WiFi.mode(WIFI_AP_STA);
 
-    Serial.println("[WEB] WiFi AP mode");
+    Serial.println("[WEB] WiFi AP + STA mode");
 
     const char *apName = "SmartLock-Setup";
 

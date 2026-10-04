@@ -52,7 +52,9 @@ bool connectWifi()
     Serial.print("[WIFI] SSID: ");
     Serial.println(networkConfig.ssid);
 
-    WiFi.mode(WIFI_STA);
+    // Keep the setup access point available while connecting to the
+    // configured Wi-Fi network.
+    WiFi.mode(WIFI_AP_STA);
     WiFi.begin(
         networkConfig.ssid.c_str(),
         networkConfig.password.c_str());
@@ -234,33 +236,25 @@ void setup()
     Serial.println("[SETUP] Card enroll subscription OK");
 
     // --------------------------------------------------------
-    // NO CONFIG -> WEB CONFIGURATION MODE
+    // WEB CONFIGURATION SERVER
     // --------------------------------------------------------
+
+    Serial.println("[SETUP] Starting WebConfigService...");
+
+    if (!webConfig.begin())
+    {
+        Serial.println("[SETUP] WebConfigService FAILED");
+    }
+    else
+    {
+        Serial.println("[SETUP] WebConfigService OK");
+        Serial.println("[SETUP] Setup AP: SmartLock-Setup");
+        Serial.println("[SETUP] Setup URL: http://192.168.4.1");
+    }
 
     if (!hasConfig)
     {
-        Serial.println();
-        Serial.println("================================");
-        Serial.println("     CONFIGURATION MODE");
-        Serial.println("================================");
-
-        Serial.println("[SETUP] Starting WebConfigService...");
-
-        if (!webConfig.begin())
-        {
-            Serial.println("[SETUP] WebConfigService FAILED");
-        }
-        else
-        {
-            Serial.println("[SETUP] WebConfigService OK");
-
-            Serial.println();
-            Serial.println("Connect to Wi-Fi:");
-            Serial.println("SSID: SmartLock-Setup");
-            Serial.println("Open: http://192.168.4.1");
-            Serial.println();
-        }
-
+        Serial.println("[SETUP] Waiting for network configuration");
         return;
     }
 
@@ -274,11 +268,6 @@ void setup()
     {
         Serial.println(
             "[SETUP] WiFi failed");
-
-        Serial.println(
-            "[SETUP] Starting WebConfigService...");
-
-        webConfig.begin();
 
         return;
     }
@@ -311,9 +300,10 @@ void setup()
 
 void loop()
 {
+    webConfig.handleClient();
+
     if (!config.hasConfig())
     {
-        webConfig.handleClient();
         delay(2);
 
         return;
