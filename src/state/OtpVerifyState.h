@@ -12,7 +12,9 @@ public:
     void onEnrollResult(LockController &ctx, bool ok) override;
 
     void setForAccess(bool value);
+    void onOtpReceived(LockController &ctx) override;
 
 private:
     bool forAccess = false;
+    bool waitingForDecision = false;
 };

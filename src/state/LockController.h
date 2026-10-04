@@ -1,10 +1,12 @@
 #pragma once
 
 #include <Arduino.h>
+
 #include "IState.h"
 #include "IdleState.h"
 #include "OtpVerifyState.h"
 #include "EnrollState.h"
+
 #include "../lcd/ILcd.h"
 #include "../mqtt/IMqttClient.h"
 #include "../otp/IOtpService.h"
@@ -23,6 +25,7 @@ public:
     void onVerifyResult(bool valid);
     void onEnrollResult(bool ok);
     void onOtpReceived();
+    void requestNewOtp();
 
     void resetInput();
     void appendKey(char key);
@@ -37,11 +40,11 @@ public:
     IdleState idleState;
     OtpVerifyState otpVerifyState;
     EnrollState enrollState;
-
     bool verifyingForAccess = false;
 
 private:
     IState *current = nullptr;
     char input[AppConfig::Otp::LENGTH + 1] = {};
     uint8_t inputLength = 0;
+    bool waitingForNewOtp = false;
 };

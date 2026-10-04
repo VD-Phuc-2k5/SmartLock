@@ -48,12 +48,59 @@ void LockController::onEnrollResult(bool ok)
 
 void LockController::onOtpReceived()
 {
+    if (waitingForNewOtp)
+    {
+        waitingForNewOtp = false;
+
+        resetInput();
+
+        Serial.println("[OTP] New OTP received");
+        Serial.println("[OTP] Attempt counter reset");
+
+        if (current == &otpVerifyState)
+        {
+            otpVerifyState.setForAccess(true);
+
+            lcd.clear();
+            lcd.print("Enter new OTP");
+        }
+
+        return;
+    }
+
     if (verifyingForAccess && current == &idleState)
     {
         verifyingForAccess = false;
-        setState(&otpVerifyState);
+
+        resetInput();
+
         otpVerifyState.setForAccess(true);
+        setState(&otpVerifyState);
+
+        Serial.println("[OTP] Access OTP received");
+        Serial.println("[OTP] Waiting for user input");
+
+        return;
     }
+}
+
+void LockController::requestNewOtp()
+{
+    Serial.println("[OTP] User selected A");
+    Serial.println("[OTP] Requesting new OTP...");
+
+    resetInput();
+
+    waitingForNewOtp = true;
+
+    mqtt.publish(
+        AppConfig::Topics::OTP_REQUEST,
+        "1");
+
+    lcd.clear();
+    lcd.print("Requesting OTP");
+
+    Serial.println("[OTP] Waiting for backend OTP...");
 }
 
 void LockController::resetInput()
@@ -64,11 +111,13 @@ void LockController::resetInput()
 
 void LockController::appendKey(char key)
 {
-    if (inputLength < AppConfig::Otp::LENGTH)
+    if (inputLength >= AppConfig::Otp::LENGTH)
     {
-        input[inputLength++] = key;
-        input[inputLength] = '\0';
+        return;
     }
+
+    input[inputLength++] = key;
+    input[inputLength] = '\0';
 }
 
 const char *LockController::getInput() const
