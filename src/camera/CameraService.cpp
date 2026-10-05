@@ -46,7 +46,7 @@ bool CameraService::begin()
     else
     {
         config.frame_size = FRAMESIZE_QQVGA;
-        config.jpeg_quality = 15;
+        config.jpeg_quality = 8;
         config.fb_count = 1;
         config.fb_location = CAMERA_FB_IN_DRAM;
         config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
