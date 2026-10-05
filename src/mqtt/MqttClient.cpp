@@ -21,24 +21,13 @@ void MqttClient::begin()
     const NetworkConfig &config =
         configManager.get();
 
-    if (WiFi.status() != WL_CONNECTED)
-    {
-        Serial.println(
-            "[MQTT] WiFi is not connected");
-
-        return;
-    }
-
-    Serial.println(
-        "Connected to WiFi");
+    Serial.println("Connected to WiFi");
 
     Serial.print("ESP32 IP: ");
-    Serial.println(
-        WiFi.localIP());
+    Serial.println(WiFi.localIP());
 
     Serial.print("Gateway: ");
-    Serial.println(
-        WiFi.gatewayIP());
+    Serial.println(WiFi.gatewayIP());
 
     Serial.print("MQTT Broker: ");
     Serial.print(config.mqttHost);
@@ -48,7 +37,8 @@ void MqttClient::begin()
 
     mqttClient.setServer(
         config.mqttHost.c_str(),
-        config.mqttPort);
+        config.mqttPort
+    );
 
     mqttClient.setCallback(
         [this](
@@ -60,7 +50,8 @@ void MqttClient::begin()
                 topic,
                 payload,
                 length);
-        });
+        }
+    );
 
     connect();
 }
@@ -68,11 +59,6 @@ void MqttClient::begin()
 void MqttClient::loop()
 {
     if (!configManager.hasConfig())
-    {
-        return;
-    }
-
-    if (WiFi.status() != WL_CONNECTED)
     {
         return;
     }
@@ -98,20 +84,17 @@ void MqttClient::loop()
 
 void MqttClient::connect()
 {
-    Serial.println(
-        "Connecting to MQTT broker...");
+    Serial.println("Connecting to MQTT broker...");
 
-    if (
-        mqttClient.connect(
-            AppConfig::Mqtt::CLIENT_ID))
+    if (mqttClient.connect(AppConfig::Mqtt::CLIENT_ID))
     {
-        Serial.println(
-            "Connected to MQTT broker");
+        Serial.println("Connected to MQTT broker");
 
         for (
             uint8_t i = 0;
             i < subscriptionCount;
-            i++)
+            i++
+        )
         {
             mqttClient.subscribe(
                 subscriptions[i].topic);
@@ -119,11 +102,8 @@ void MqttClient::connect()
     }
     else
     {
-        Serial.print(
-            "Failed to connect to MQTT broker, rc=");
-
-        Serial.println(
-            mqttClient.state());
+        Serial.print("Failed to connect to MQTT broker, rc=");
+        Serial.println(mqttClient.state());
     }
 }
 
@@ -138,8 +118,7 @@ bool MqttClient::subscribe(
         return false;
     }
 
-    subscriptions[subscriptionCount] =
-        {topic, handler};
+    subscriptions[subscriptionCount] = {topic, handler};
 
     subscriptionCount++;
 
@@ -153,7 +132,8 @@ bool MqttClient::subscribe(
 
 bool MqttClient::publish(
     const char *topic,
-    const char *message)
+    const char *message
+)
 {
     if (!mqttClient.connected())
     {

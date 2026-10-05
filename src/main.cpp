@@ -52,11 +52,19 @@ bool connectWifi()
     const NetworkConfig &networkConfig = config.get();
 
     Serial.println("[WIFI] Connecting...");
+
     Serial.print("[WIFI] SSID: ");
     Serial.println(networkConfig.ssid);
 
-    WiFi.mode(WIFI_AP_STA);
-    WiFi.begin(networkConfig.ssid.c_str(), networkConfig.password.c_str());
+    // Chỉ kết nối STA.
+    // WebConfigService chỉ mở AP khi chưa có config.
+    WiFi.mode(WIFI_STA);
+
+    delay(100);
+
+    WiFi.begin(
+        networkConfig.ssid.c_str(),
+        networkConfig.password.c_str());
 
     unsigned long start = millis();
 
@@ -88,7 +96,9 @@ bool connectWifi()
 // CAMERA UPLOAD
 // ============================================================
 
-bool uploadCameraFrame(const uint8_t *data, size_t size)
+bool uploadCameraFrame(
+    const uint8_t *data,
+    size_t size)
 {
     if (data == nullptr || size == 0)
     {
@@ -117,8 +127,11 @@ bool uploadCameraFrame(const uint8_t *data, size_t size)
     WiFiClient client;
     HTTPClient http;
 
-    http.setConnectTimeout(AppConfig::Camera::HTTP_TIMEOUT_MS);
-    http.setTimeout(AppConfig::Camera::HTTP_TIMEOUT_MS);
+    http.setConnectTimeout(
+        AppConfig::Camera::HTTP_TIMEOUT_MS);
+
+    http.setTimeout(
+        AppConfig::Camera::HTTP_TIMEOUT_MS);
 
     if (!http.begin(client, url))
     {
@@ -126,9 +139,15 @@ bool uploadCameraFrame(const uint8_t *data, size_t size)
         return false;
     }
 
-    http.addHeader("Content-Type", "image/jpeg");
+    http.addHeader(
+        "Content-Type",
+        "image/jpeg");
 
-    int httpCode = http.sendRequest("POST", const_cast<uint8_t *>(data), size);
+    int httpCode =
+        http.sendRequest(
+            "POST",
+            const_cast<uint8_t *>(data),
+            size);
 
     Serial.print("[CAMERA] HTTP status: ");
     Serial.println(httpCode);
@@ -136,21 +155,22 @@ bool uploadCameraFrame(const uint8_t *data, size_t size)
     if (httpCode > 0)
     {
         String response = http.getString();
+
         Serial.print("[CAMERA] Server response: ");
         Serial.println(response);
     }
     else
     {
         Serial.print("[CAMERA] HTTP error: ");
-        Serial.println(http.errorToString(httpCode));
+        Serial.println(
+            http.errorToString(httpCode));
     }
 
     http.end();
 
     return (
         httpCode >= 200 &&
-        httpCode < 300
-    );
+        httpCode < 300);
 }
 
 // ============================================================
@@ -178,7 +198,8 @@ void setup()
 
     if (hasConfig)
     {
-        Serial.println("[SETUP] Network configuration loaded");
+        Serial.println(
+            "[SETUP] Network configuration loaded");
 
         Serial.print("[SETUP] SSID: ");
         Serial.println(config.get().ssid);
@@ -191,7 +212,8 @@ void setup()
     }
     else
     {
-        Serial.println("[SETUP] No valid network configuration");
+        Serial.println(
+            "[SETUP] No valid network configuration");
     }
 
     // --------------------------------------------------------
@@ -250,15 +272,21 @@ void setup()
 
         CameraFrame frame = camera.capture();
 
-        if (frame.data != nullptr && frame.size > 0)
+        if (
+            frame.data != nullptr &&
+            frame.size > 0)
         {
-            Serial.print("[SETUP] Camera capture OK: ");
+            Serial.print(
+                "[SETUP] Camera capture OK: ");
+
             Serial.print(frame.size);
+
             Serial.println(" bytes");
         }
         else
         {
-            Serial.println("[SETUP] Camera capture FAILED");
+            Serial.println(
+                "[SETUP] Camera capture FAILED");
         }
 
         camera.release();
@@ -286,24 +314,31 @@ void setup()
     Serial.println("[SETUP] LockController OK");
 
     // --------------------------------------------------------
-    // MQTT
+    // MQTT SUBSCRIPTIONS
     // --------------------------------------------------------
 
-    Serial.println("[SETUP] 9. MQTT subscriptions");
+    Serial.println(
+        "[SETUP] 9. MQTT subscriptions");
 
     mqtt.subscribe(
         AppConfig::Topics::OTP,
-        [](const char *payload, unsigned int length)
+        [](const char *payload,
+           unsigned int length)
         {
-            otp.setOtp(payload, length);
+            otp.setOtp(
+                payload,
+                length);
+
             controller.onOtpReceived();
         });
 
-    Serial.println("[SETUP] OTP subscription OK");
+    Serial.println(
+        "[SETUP] OTP subscription OK");
 
     mqtt.subscribe(
         AppConfig::Topics::CARD_VERIFY_RESULT,
-        [](const char *payload, unsigned int length)
+        [](const char *payload,
+           unsigned int length)
         {
             bool valid =
                 length == 5 &&
@@ -315,11 +350,13 @@ void setup()
             controller.onVerifyResult(valid);
         });
 
-    Serial.println("[SETUP] Card verify subscription OK");
+    Serial.println(
+        "[SETUP] Card verify subscription OK");
 
     mqtt.subscribe(
         AppConfig::Topics::CARD_ENROLL_RESULT,
-        [](const char *payload, unsigned int length)
+        [](const char *payload,
+           unsigned int length)
         {
             bool ok =
                 length == 2 &&
@@ -331,28 +368,45 @@ void setup()
             controller.onEnrollResult(ok);
         });
 
-    Serial.println("[SETUP] Card enroll subscription OK");
+    Serial.println(
+        "[SETUP] Card enroll subscription OK");
 
     // --------------------------------------------------------
     // WEB CONFIGURATION SERVER
     // --------------------------------------------------------
 
-    Serial.println("[SETUP] Starting WebConfigService...");
+    Serial.println(
+        "[SETUP] Starting WebConfigService...");
 
     if (!webConfig.begin())
     {
-        Serial.println("[SETUP] WebConfigService FAILED");
+        Serial.println(
+            "[SETUP] WebConfigService FAILED");
     }
     else
     {
-        Serial.println("[SETUP] WebConfigService OK");
-        Serial.println("[SETUP] Setup AP: SmartLock-Setup");
-        Serial.println("[SETUP] Setup URL: http://192.168.4.1");
+        Serial.println(
+            "[SETUP] WebConfigService OK");
+
+        if (!hasConfig)
+        {
+            Serial.println(
+                "[SETUP] Setup AP: SmartLock-Setup");
+
+            Serial.println(
+                "[SETUP] Setup URL: http://192.168.4.1");
+        }
     }
+
+    // --------------------------------------------------------
+    // NO CONFIG
+    // --------------------------------------------------------
 
     if (!hasConfig)
     {
-        Serial.println("[SETUP] Waiting for network configuration");
+        Serial.println(
+            "[SETUP] Waiting for network configuration");
+
         return;
     }
 
@@ -364,7 +418,9 @@ void setup()
 
     if (!connectWifi())
     {
-        Serial.println("[SETUP] WiFi failed");
+        Serial.println(
+            "[SETUP] WiFi failed");
+
         return;
     }
 
@@ -378,16 +434,23 @@ void setup()
 
     mqtt.begin();
 
-    Serial.println("[SETUP] MQTT begin returned");
+    Serial.println(
+        "[SETUP] MQTT begin returned");
 
     // --------------------------------------------------------
     // SETUP FINISHED
     // --------------------------------------------------------
 
     Serial.println();
-    Serial.println("================================");
-    Serial.println("   [MAIN] Smart Lock started");
-    Serial.println("================================");
+
+    Serial.println(
+        "================================");
+
+    Serial.println(
+        "   [MAIN] Smart Lock started");
+
+    Serial.println(
+        "================================");
 }
 
 // ============================================================
@@ -396,7 +459,15 @@ void setup()
 
 void loop()
 {
+    // --------------------------------------------------------
+    // WEB CONFIG
+    // --------------------------------------------------------
+
     webConfig.handleClient();
+
+    // --------------------------------------------------------
+    // NO CONFIG
+    // --------------------------------------------------------
 
     if (!config.hasConfig())
     {
@@ -404,7 +475,12 @@ void loop()
         return;
     }
 
+    // --------------------------------------------------------
+    // MQTT
+    // --------------------------------------------------------
+
     mqtt.loop();
+
     // --------------------------------------------------------
     // RFID
     // --------------------------------------------------------
@@ -422,7 +498,9 @@ void loop()
     // --------------------------------------------------------
     // KEYPAD
     // --------------------------------------------------------
+
     char key = keypad.readkey();
+
     if (key != NO_KEY)
     {
         Serial.print("[KEYPAD] Key: ");
@@ -434,35 +512,54 @@ void loop()
 
         if (key == 'C')
         {
-            Serial.println("[CAMERA] Capture requested");
+            Serial.println(
+                "[CAMERA] Capture requested");
 
-            CameraFrame frame =camera.capture();
+            CameraFrame frame =
+                camera.capture();
 
-            if (frame.data != nullptr && frame.size > 0)
+            if (
+                frame.data != nullptr &&
+                frame.size > 0)
             {
-                Serial.print("[CAMERA] Uploading ");
-                Serial.print(frame.size);
-                Serial.println(" bytes...");
+                Serial.print(
+                    "[CAMERA] Uploading ");
 
-                bool uploaded = uploadCameraFrame(frame.data, frame.size);
+                Serial.print(frame.size);
+
+                Serial.println(
+                    " bytes...");
+
+                bool uploaded =
+                    uploadCameraFrame(
+                        frame.data,
+                        frame.size);
 
                 if (uploaded)
                 {
-                    Serial.println("[CAMERA] Upload OK");
+                    Serial.println(
+                        "[CAMERA] Upload OK");
                 }
                 else
                 {
-                    Serial.println("[CAMERA] Upload FAILED");
+                    Serial.println(
+                        "[CAMERA] Upload FAILED");
                 }
             }
             else
             {
-                Serial.println("[CAMERA] Capture FAILED");
+                Serial.println(
+                    "[CAMERA] Capture FAILED");
             }
 
             camera.release();
+
             return;
         }
+
+        // ----------------------------------------------------
+        // OTHER KEYS
+        // ----------------------------------------------------
 
         controller.onKey(key);
     }

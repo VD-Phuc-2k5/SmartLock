@@ -14,216 +14,214 @@ void WebConfigService::handleRoot()
     const NetworkConfig &config = configManager.get();
 
     String html = R"rawliteral(
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width,initial-scale=1">
-        <title>Smart Lock Setup</title>
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Smart Lock Setup</title>
 
-        <style>
-            :root {
-                --primary: #0284c7;
-                --primary-hover: #0369a1;
-            }
+    <style>
+        :root {
+            --primary: #0284c7;
+            --primary-hover: #0369a1;
+        }
 
-            body {
-                font-family: Arial, sans-serif;
-                max-width: 480px;
-                margin: 40px auto;
-                padding: 20px;
-            }
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 480px;
+            margin: 40px auto;
+            padding: 20px;
+        }
 
-            h1 {
-                font-size: 24px;
-                color: var(--primary);
-            }
+        h1 {
+            font-size: 24px;
+            color: var(--primary);
+        }
 
-            label {
-                display: block;
-                margin-top: 16px;
-                font-weight: 600;
-            }
+        label {
+            display: block;
+            margin-top: 16px;
+            font-weight: 600;
+        }
 
-            input {
-                box-sizing: border-box;
-                width: 100%;
-                padding: 12px;
-                margin-top: 6px;
-                border: 1px solid #ccc;
-                border-radius: 8px;
-                font-size: 16px;
-                outline: none;
-            }
+        input {
+            box-sizing: border-box;
+            width: 100%;
+            padding: 12px;
+            margin-top: 6px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 16px;
+            outline: none;
+        }
 
-            input:focus {
-                border-color: var(--primary);
-                box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15);
-            }
+        input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15);
+        }
 
-            .password-wrapper {
-                position: relative;
-            }
+        .password-wrapper {
+            position: relative;
+        }
 
-            .password-wrapper input {
-                padding-right: 70px;
-            }
+        .password-wrapper input {
+            padding-right: 70px;
+        }
 
-            .toggle-password {
-                position: absolute;
-                right: 8px;
-                top: 50%;
-                transform: translateY(-50%);
+        .toggle-password {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: auto;
+            margin: 0;
+            padding: 6px 8px;
+            border: none;
+            background: transparent;
+            color: var(--primary);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
 
-                width: auto;
-                margin: 0;
-                padding: 6px 8px;
+        .toggle-password:hover {
+            color: var(--primary-hover);
+        }
 
-                border: none;
-                background: transparent;
-                color: var(--primary);
-                font-size: 14px;
-                font-weight: 600;
-                cursor: pointer;
-            }
+        button.submit {
+            width: 100%;
+            padding: 12px;
+            margin-top: 22px;
+            border: 0;
+            border-radius: 8px;
+            background: var(--primary);
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
 
-            .toggle-password:hover {
-                color: var(--primary-hover);
-            }
+        button.submit:hover {
+            background: var(--primary-hover);
+        }
 
-            button.submit {
-                width: 100%;
-                padding: 12px;
-                margin-top: 22px;
-                border: 0;
-                border-radius: 8px;
-                background: var(--primary);
-                color: white;
-                font-size: 16px;
-                cursor: pointer;
-            }
+        .reset {
+            width: 100%;
+            padding: 12px;
+            margin-top: 12px;
+            border: 0;
+            border-radius: 8px;
+            background: #c62828;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
 
-            button.submit:hover {
-                background: var(--primary-hover);
-            }
+<body>
 
-            .reset {
-                width: 100%;
-                padding: 12px;
-                margin-top: 12px;
-                border: 0;
-                border-radius: 8px;
-                background: #c62828;
-                color: white;
-                font-size: 16px;
-                cursor: pointer;
-            }
-        </style>
-    </head>
+    <h1>Smart Lock Setup</h1>
 
-    <body>
+    <form method="POST" action="/save">
 
-        <h1>Smart Lock Setup</h1>
+        <label>Wi-Fi SSID</label>
 
-        <form method="POST" action="/save">
-
-            <label>Wi-Fi SSID</label>
-
-            <input
-                name="ssid"
-                required
-                value=")rawliteral";
+        <input
+            name="ssid"
+            required
+            value=")rawliteral";
 
     html += config.ssid;
 
     html += R"rawliteral(">
 
-            <label>Wi-Fi Password</label>
+        <label>Wi-Fi Password</label>
 
-            <div class="password-wrapper">
+        <div class="password-wrapper">
 
-                <input
-                    id="password"
-                    type="password"
-                    name="password"
-                    value=")rawliteral";
+            <input
+                id="password"
+                type="password"
+                name="password"
+                value=")rawliteral";
 
     html += config.password;
 
     html += R"rawliteral(">
 
-                <button
-                    type="button"
-                    class="toggle-password"
-                    onclick="togglePassword()">
-                    Hiện
-                </button>
+            <button
+                type="button"
+                class="toggle-password"
+                onclick="togglePassword()">
+                Hiện
+            </button>
 
-            </div>
+        </div>
 
-            <label>MQTT Broker</label>
+        <label>MQTT Broker</label>
 
-            <input
-                name="mqttHost"
-                required
-                value=")rawliteral";
+        <input
+            name="mqttHost"
+            required
+            value=")rawliteral";
 
     html += config.mqttHost;
 
     html += R"rawliteral(">
 
-            <label>MQTT Port</label>
+        <label>MQTT Port</label>
 
-            <input
-                type="number"
-                name="mqttPort"
-                min="1"
-                max="65535"
-                value=")rawliteral";
+        <input
+            type="number"
+            name="mqttPort"
+            min="1"
+            max="65535"
+            value=")rawliteral";
 
     html += String(config.mqttPort);
 
     html += R"rawliteral(">
 
-            <button
-                type="submit"
-                class="submit">
-                Save & Restart
-            </button>
+        <button
+            type="submit"
+            class="submit">
+            Save & Restart
+        </button>
 
-        </form>
+    </form>
 
-        <form method="POST" action="/reset">
+    <form method="POST" action="/reset">
 
-            <button
-                class="reset"
-                type="submit">
-                Clear Configuration
-            </button>
+        <button
+            class="reset"
+            type="submit">
+            Clear Configuration
+        </button>
 
-        </form>
+    </form>
 
-        <script>
-            function togglePassword() {
-                const password =
-                    document.getElementById("password");
+    <script>
+        function togglePassword() {
+            const password =
+                document.getElementById("password");
 
-                const button =
-                    document.querySelector(".toggle-password");
+            const button =
+                document.querySelector(".toggle-password");
 
-                if (password.type === "password") {
-                    password.type = "text";
-                    button.textContent = "Ẩn";
-                } else {
-                    password.type = "password";
-                    button.textContent = "Hiện";
-                }
+            if (password.type === "password") {
+                password.type = "text";
+                button.textContent = "Ẩn";
+            } else {
+                password.type = "password";
+                button.textContent = "Hiện";
             }
-        </script>
+        }
+    </script>
 
-    </body>
-    </html>
-    )rawliteral";
+</body>
+</html>
+)rawliteral";
 
     server.send(200, "text/html", html);
 }
@@ -312,15 +310,28 @@ bool WebConfigService::begin()
 {
     Serial.println("[WEB] ===== BEGIN START =====");
 
-    // Keep the setup AP available even when the device is also connected
-    // to the configured Wi-Fi network.
-    WiFi.mode(WIFI_AP_STA);
+    // Nếu đã có cấu hình thì không cần mở Setup AP.
+    // main.cpp sẽ xử lý kết nối WiFi STA.
+    if (configManager.hasConfig())
+    {
+        Serial.println("[WEB] Network configuration already exists");
+        Serial.println("[WEB] Setup AP skipped");
+        Serial.println("[WEB] ===== BEGIN END =====");
 
-    Serial.println("[WEB] WiFi AP + STA mode");
+        return true;
+    }
+
+    Serial.println("[WEB] No network configuration");
+    Serial.println("[WEB] Starting Setup AP...");
 
     const char *apName = "SmartLock-Setup";
+    const char *apPassword = "12345678";
 
-    if (!WiFi.softAP(apName))
+    WiFi.mode(WIFI_AP);
+
+    delay(200);
+
+    if (!WiFi.softAP(apName, apPassword))
     {
         Serial.println("[WEB] AP START FAILED");
         return false;

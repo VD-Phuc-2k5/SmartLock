@@ -38,11 +38,11 @@ bool CameraService::begin()
 
     if (psramFound())
     {
-        config.frame_size = FRAMESIZE_VGA;
-        config.jpeg_quality = 8;
+        config.frame_size = FRAMESIZE_VGA; 
+        config.jpeg_quality = 10;
         config.fb_count = 1;
-        config.fb_location = CAMERA_FB_IN_PSRAM;
-        config.grab_mode = CAMERA_GRAB_LATEST;
+        config.fb_location = CAMERA_FB_IN_DRAM; 
+        config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
     }
     else
     {
@@ -83,6 +83,12 @@ bool CameraService::begin()
 
     Serial.print("[CAMERA] PSRAM: ");
     Serial.println(psramFound() ? "YES" : "NO");
+    
+    Serial.print("[CAMERA] Free PSRAM: ");
+    Serial.println(ESP.getFreePsram());
+
+    Serial.print("[CAMERA] Free Heap: ");
+    Serial.println(ESP.getFreeHeap());
 
     return true;
 }
@@ -95,10 +101,12 @@ CameraFrame CameraService::capture()
         return {};
     }
 
-    if (currentFrame != nullptr)
+    release();
+
+    camera_fb_t *stale = esp_camera_fb_get();
+    if (stale != nullptr)
     {
-        esp_camera_fb_return(currentFrame);
-        currentFrame = nullptr;
+        esp_camera_fb_return(stale);
     }
 
     currentFrame = esp_camera_fb_get();
