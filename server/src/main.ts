@@ -28,6 +28,7 @@ const notifier = new CompositeNotifier([
 const cardStore = new JsonFileCardStore(config.card.filePath);
 const cardService = new CardService(cardStore);
 const cardEvents = new CardEventBus();
+let latestCameraFrame: Buffer | null = null;
 
 await mqttClient.connect();
 
@@ -98,8 +99,52 @@ function sendJson(res: http.ServerResponse, status: number, body: unknown): void
 function readBody(req: http.IncomingMessage): Promise<string> {
     return new Promise((resolve, reject) => {
         let data = '';
-        req.on('data', (chunk) => (data += chunk));
-        req.on('end', () => resolve(data));
+
+        req.on(
+            'data',
+            (chunk) => {
+                data += chunk;
+            },
+        );
+
+        req.on('end', () => {
+            resolve(data);
+        });
+
+        req.on('error', reject);
+    });
+}
+
+function readBinaryBody(req: http.IncomingMessage): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+        const chunks: Buffer[] = [];
+        let totalSize = 0;
+
+        req.on('data', (chunk: Buffer) => {
+            totalSize += chunk.length;
+
+            if (totalSize > config.camera.maxUploadBytes) {
+                reject(
+                    new Error(
+                        'camera image too large',
+                    ),
+                );
+
+                req.destroy();
+                return;
+            }
+
+            chunks.push(
+                Buffer.from(chunk),
+            );
+        });
+
+        req.on('end', () => {
+            resolve(
+                Buffer.concat(chunks),
+            );
+        });
+
         req.on('error', reject);
     });
 }
@@ -121,132 +166,387 @@ function parseCards(value: unknown): Card[] | null {
         if (!item || typeof item !== 'object') {
             return null;
         }
-        const { uid, email } = item as { uid?: unknown; email?: unknown };
-        if (typeof uid !== 'string' || !uid) {
+        const { uid, email } = item as {
+            uid?: unknown;
+            email?: unknown;
+        };
+
+        if (typeof uid !== 'string' || !uid
+        ) {
             return null;
         }
-        if (email !== undefined && typeof email !== 'string') {
+
+        if (
+            email !== undefined &&
+            typeof email !== 'string'
+        ) {
             return null;
         }
-        cards.push({ uid, email: email ?? '' });
+
+        cards.push({
+            uid,
+            email: email ?? '',
+        });
     }
+
     return cards;
 }
 
-const server = http.createServer(async (req, res) => {
-    if (req.method === 'OPTIONS') {
-        res.writeHead(204, corsHeaders);
-        res.end();
-        return;
-    }
+const server =
+    http.createServer(
+        async (req, res) => {
+            if (
+                req.method === 'OPTIONS'
+            ) {
+                res.writeHead(
+                    204,
+                    corsHeaders,
+                );
 
-    if (req.method === 'GET' && req.url === '/api/cards') {
-        const cards = await cardService.list();
-        sendJson(res, 200, { cards });
-        return;
-    }
+                res.end();
+                return;
+            }
 
-    if (req.method === 'GET' && req.url === '/api/cards/events') {
-        res.writeHead(200, {
-            'Content-Type': 'text/event-stream',
-            'Cache-Control': 'no-cache',
-            'Connection': 'keep-alive',
-            ...corsHeaders,
-        });
-        res.write(': connected\n\n');
+            if (
+                req.method === 'GET' &&
+                req.url === '/api/cards'
+            ) {
+                const cards =
+                    await cardService.list();
 
-        const send = (cards: Card[]) => {
-            res.write(`data: ${JSON.stringify({ cards })}\n\n`);
-        };
+                sendJson(
+                    res,
+                    200,
+                    { cards },
+                );
 
-        send(await cardService.list());
+                return;
+            }
 
-        const unsubscribe = cardEvents.subscribe(send);
-        req.on('close', () => {
-            unsubscribe();
-        });
-        return;
-    }
+            if (
+                req.method === 'GET' &&
+                req.url === '/api/cards/events'
+            ) {
+                res.writeHead(200, {
+                    'Content-Type':
+                        'text/event-stream',
+                    'Cache-Control':
+                        'no-cache',
+                    'Connection':
+                        'keep-alive',
+                    ...corsHeaders,
+                });
 
-    if (req.method === 'PUT' && req.url === '/api/cards') {
-        const body = await readBody(req);
+                res.write(
+                    ': connected\n\n',
+                );
 
-        let payload: unknown;
-        try {
-            payload = parseJson(body);
-        } catch {
-            sendJson(res, 400, { error: 'invalid JSON body' });
-            return;
-        }
+                const send = (
+                    cards: Card[],
+                ) => {
+                    res.write(
+                        `data: ${JSON.stringify({ cards })}\n\n`,
+                    );
+                };
 
-        const cards = parseCards((payload as { cards?: unknown }).cards);
-        if (!cards) {
-            sendJson(res, 400, { error: 'cards must be an array of { uid, email }' });
-            return;
-        }
+                send(
+                    await cardService.list(),
+                );
 
-        await cardService.update(cards);
-        console.log(`[CARD] updated ${cards.length} cards`);
-        cardEvents.publish(await cardService.list());
-        sendJson(res, 200, { cards });
-        return;
-    }
+                const unsubscribe =
+                    cardEvents.subscribe(send);
 
-    if (req.method === 'POST' && req.url === '/api/otp') {
-        const body = await readBody(req);
+                req.on(
+                    'close',
+                    () => {
+                        unsubscribe();
+                    },
+                );
 
-        let deviceId: unknown;
-        let email: unknown;
-        try {
-            ({ deviceId, email } = parseJson(body));
-        } catch {
-            sendJson(res, 400, { error: 'invalid JSON body' });
-            return;
-        }
+                return;
+            }
 
-        if (typeof deviceId !== 'string' || !deviceId) {
-            sendJson(res, 400, { error: 'deviceId is required' });
-            return;
-        }
+            if (
+                req.method === 'POST' &&
+                req.url === '/api/camera/frame'
+            ) {
+                try {
+                    const contentType =
+                        req.headers[
+                            'content-type'
+                        ];
 
-        if (typeof email !== 'string' || !email.includes('@')) {
-            sendJson(res, 400, { error: 'email is required' });
-            return;
-        }
+                    if (
+                        contentType !==
+                        'image/jpeg'
+                    ) {
+                        sendJson(
+                            res,
+                            415,
+                            {
+                                error:
+                                    'Content-Type must be image/jpeg',
+                            },
+                        );
 
-        const record = otpService.issue(deviceId, email);
-        await notifier.notify(record);
-        console.log(`[OTP] device=${deviceId} email=${email} code=${record.code} expiresAt=${new Date(record.expiresAt).toISOString()}`);
+                        return;
+                    }
 
-        sendJson(res, 200, { deviceId, expiresAt: record.expiresAt });
-        return;
-    }
+                    const frame =
+                        await readBinaryBody(req);
 
-    if (req.method === 'POST' && req.url === '/api/otp/verify') {
-        const body = await readBody(req);
+                    if (
+                        frame.length === 0
+                    ) {
+                        sendJson(
+                            res,
+                            400,
+                            {
+                                error:
+                                    'empty camera frame',
+                            },
+                        );
 
-        let deviceId: unknown;
-        let code: unknown;
-        try {
-            ({ deviceId, code } = parseJson(body));
-        } catch {
-            sendJson(res, 400, { error: 'invalid JSON body' });
-            return;
-        }
+                        return;
+                    }
 
-        if (typeof deviceId !== 'string' || typeof code !== 'string') {
-            sendJson(res, 400, { error: 'deviceId and code are required' });
-            return;
-        }
+                    latestCameraFrame =
+                        frame;
 
-        const valid = otpService.verify(deviceId, code);
-        sendJson(res, 200, { valid });
-        return;
-    }
+                    console.log(
+                        `[CAMERA] Frame received: ${frame.length} bytes`,
+                    );
 
-    sendJson(res, 404, { error: 'not found' });
-});
+                    sendJson(
+                        res,
+                        200,
+                        {
+                            success: true,
+                            size: frame.length,
+                        },
+                    );
+                } catch (error) {
+                    console.error(
+                        '[CAMERA] Upload error:',
+                        error,
+                    );
 
-server.listen(config.http.port, () => {
-    console.log(`HTTP server listening on port ${config.http.port}`);
-});
+                    sendJson(
+                        res,
+                        413,
+                        {
+                            error:
+                                'camera frame too large',
+                        },
+                    );
+                }
+
+                return;
+            }
+
+            if (
+                req.method === 'GET' &&
+                req.url === '/api/camera/frame'
+            ) {
+                if (
+                    latestCameraFrame === null
+                ) {
+                    sendJson(
+                        res,
+                        404,
+                        {
+                            error:
+                                'no camera frame',
+                        },
+                    );
+
+                    return;
+                }
+
+                res.writeHead(200, {
+                    'Content-Type':
+                        'image/jpeg',
+                    'Content-Length':
+                        latestCameraFrame.length,
+                    'Cache-Control':
+                        'no-store',
+                    ...corsHeaders,
+                });
+
+                res.end(
+                    latestCameraFrame,
+                );
+
+                return;
+            }
+
+            if (
+                req.method === 'POST' &&
+                req.url === '/api/otp'
+            ) {
+                const body =
+                    await readBody(req);
+
+                let deviceId: unknown;
+                let email: unknown;
+
+                try {
+                    ({
+                        deviceId,
+                        email,
+                    } = parseJson(body));
+                } catch {
+                    sendJson(
+                        res,
+                        400,
+                        {
+                            error:
+                                'invalid JSON body',
+                        },
+                    );
+
+                    return;
+                }
+
+                if (
+                    typeof deviceId !==
+                        'string' ||
+                    !deviceId
+                ) {
+                    sendJson(
+                        res,
+                        400,
+                        {
+                            error:
+                                'deviceId is required',
+                        },
+                    );
+
+                    return;
+                }
+
+                if (
+                    typeof email !==
+                        'string' ||
+                    !email.includes('@')
+                ) {
+                    sendJson(
+                        res,
+                        400,
+                        {
+                            error:
+                                'email is required',
+                        },
+                    );
+
+                    return;
+                }
+
+                const record =
+                    otpService.issue(
+                        deviceId,
+                        email,
+                    );
+
+                await notifier.notify(
+                    record,
+                );
+
+                console.log(
+                    `[OTP] device=${deviceId} email=${email} code=${record.code} expiresAt=${new Date(record.expiresAt).toISOString()}`,
+                );
+
+                sendJson(
+                    res,
+                    200,
+                    {
+                        deviceId,
+                        expiresAt:
+                            record.expiresAt,
+                    },
+                );
+
+                return;
+            }
+
+            if (
+                req.method === 'POST' &&
+                req.url ===
+                    '/api/otp/verify'
+            ) {
+                const body =
+                    await readBody(req);
+
+                let deviceId: unknown;
+                let code: unknown;
+
+                try {
+                    ({
+                        deviceId,
+                        code,
+                    } = parseJson(body));
+                } catch {
+                    sendJson(
+                        res,
+                        400,
+                        {
+                            error:
+                                'invalid JSON body',
+                        },
+                    );
+
+                    return;
+                }
+
+                if (
+                    typeof deviceId !==
+                        'string' ||
+                    typeof code !==
+                        'string'
+                ) {
+                    sendJson(
+                        res,
+                        400,
+                        {
+                            error:
+                                'deviceId and code are required',
+                        },
+                    );
+
+                    return;
+                }
+
+                const valid =
+                    otpService.verify(
+                        deviceId,
+                        code,
+                    );
+
+                sendJson(
+                    res,
+                    200,
+                    { valid },
+                );
+
+                return;
+            }
+
+            sendJson(
+                res,
+                404,
+                {
+                    error: 'not found',
+                },
+            );
+        },
+    );
+
+server.listen(
+    config.http.port,
+    '0.0.0.0',
+    () => {
+        console.log(
+            `HTTP server listening on port ${config.http.port}`,
+        );
+    },
+);

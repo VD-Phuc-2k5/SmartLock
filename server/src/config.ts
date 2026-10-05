@@ -7,6 +7,12 @@ export const config = {
     http: {
         port: Number(process.env.HTTP_PORT ?? 3000),
     },
+    camera: {
+        maxUploadBytes: Number(
+            process.env.CAMERA_MAX_UPLOAD_BYTES ??
+                1024 * 1024,
+        ),
+    },
     otp: {
         length: 6,
         ttlMs: 5 * 60 * 1000,
