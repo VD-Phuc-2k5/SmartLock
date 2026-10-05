@@ -310,13 +310,16 @@ bool WebConfigService::begin()
 {
     Serial.println("[WEB] ===== BEGIN START =====");
 
-    // Nếu đã có cấu hình thì không cần mở Setup AP.
-    // main.cpp sẽ xử lý kết nối WiFi STA.
     if (configManager.hasConfig())
     {
-        Serial.println("[WEB] Network configuration already exists");
-        Serial.println("[WEB] Setup AP skipped");
-        Serial.println("[WEB] ===== BEGIN END =====");
+        Serial.println(
+            "[WEB] Network configuration already exists");
+
+        Serial.println(
+            "[WEB] Setup AP skipped");
+
+        Serial.println(
+            "[WEB] ===== BEGIN END =====");
 
         return true;
     }
@@ -327,15 +330,35 @@ bool WebConfigService::begin()
     const char *apName = "SmartLock-Setup";
     const char *apPassword = "12345678";
 
+    WiFi.persistent(false);
+    WiFi.setAutoReconnect(false);
+
+    Serial.println("[WEB] WiFi mode: AP");
+
     WiFi.mode(WIFI_AP);
 
-    delay(200);
+    delay(1000);
 
-    if (!WiFi.softAP(apName, apPassword))
+    Serial.println("[WEB] Calling softAP...");
+
+    bool started =
+        WiFi.softAP(
+            apName,
+            apPassword,
+            1,
+            false,
+            4);
+
+    if (!started)
     {
         Serial.println("[WEB] AP START FAILED");
+
+        WiFi.mode(WIFI_OFF);
+
         return false;
     }
+
+    delay(300);
 
     Serial.println("[WEB] AP started");
 

@@ -56,8 +56,6 @@ bool connectWifi()
     Serial.print("[WIFI] SSID: ");
     Serial.println(networkConfig.ssid);
 
-    // Chỉ kết nối STA.
-    // WebConfigService chỉ mở AP khi chưa có config.
     WiFi.mode(WIFI_STA);
 
     delay(100);
@@ -214,6 +212,38 @@ void setup()
     {
         Serial.println(
             "[SETUP] No valid network configuration");
+    }
+
+    // --------------------------------------------------------
+    // SETUP AP MODE
+    // --------------------------------------------------------
+
+    if (!hasConfig)
+    {
+        Serial.println(
+            "[SETUP] Starting WebConfigService...");
+
+        if (!webConfig.begin())
+        {
+            Serial.println(
+                "[SETUP] WebConfigService FAILED");
+        }
+        else
+        {
+            Serial.println(
+                "[SETUP] WebConfigService OK");
+
+            Serial.println(
+                "[SETUP] Setup AP: SmartLock-Setup");
+
+            Serial.println(
+                "[SETUP] Setup URL: http://192.168.4.1");
+        }
+
+        Serial.println(
+            "[SETUP] Waiting for network configuration");
+
+        return;
     }
 
     // --------------------------------------------------------
@@ -387,27 +417,6 @@ void setup()
     {
         Serial.println(
             "[SETUP] WebConfigService OK");
-
-        if (!hasConfig)
-        {
-            Serial.println(
-                "[SETUP] Setup AP: SmartLock-Setup");
-
-            Serial.println(
-                "[SETUP] Setup URL: http://192.168.4.1");
-        }
-    }
-
-    // --------------------------------------------------------
-    // NO CONFIG
-    // --------------------------------------------------------
-
-    if (!hasConfig)
-    {
-        Serial.println(
-            "[SETUP] Waiting for network configuration");
-
-        return;
     }
 
     // --------------------------------------------------------
@@ -459,15 +468,7 @@ void setup()
 
 void loop()
 {
-    // --------------------------------------------------------
-    // WEB CONFIG
-    // --------------------------------------------------------
-
     webConfig.handleClient();
-
-    // --------------------------------------------------------
-    // NO CONFIG
-    // --------------------------------------------------------
 
     if (!config.hasConfig())
     {
@@ -475,15 +476,7 @@ void loop()
         return;
     }
 
-    // --------------------------------------------------------
-    // MQTT
-    // --------------------------------------------------------
-
     mqtt.loop();
-
-    // --------------------------------------------------------
-    // RFID
-    // --------------------------------------------------------
 
     if (rfid.isCardPresent())
     {
@@ -495,20 +488,12 @@ void loop()
         controller.onCard(uid);
     }
 
-    // --------------------------------------------------------
-    // KEYPAD
-    // --------------------------------------------------------
-
     char key = keypad.readkey();
 
     if (key != NO_KEY)
     {
         Serial.print("[KEYPAD] Key: ");
         Serial.println(key);
-
-        // ----------------------------------------------------
-        // C = CAMERA CAPTURE
-        // ----------------------------------------------------
 
         if (key == 'C')
         {
@@ -556,10 +541,6 @@ void loop()
 
             return;
         }
-
-        // ----------------------------------------------------
-        // OTHER KEYS
-        // ----------------------------------------------------
 
         controller.onKey(key);
     }

@@ -38,10 +38,10 @@ bool CameraService::begin()
 
     if (psramFound())
     {
-        config.frame_size = FRAMESIZE_VGA; 
+        config.frame_size = FRAMESIZE_VGA;
         config.jpeg_quality = 10;
         config.fb_count = 1;
-        config.fb_location = CAMERA_FB_IN_DRAM; 
+        config.fb_location = CAMERA_FB_IN_PSRAM;
         config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
     }
     else
@@ -55,7 +55,8 @@ bool CameraService::begin()
 
     Serial.println("[CAMERA] Initializing OV2640...");
 
-    esp_err_t result = esp_camera_init(&config);
+    esp_err_t result =
+        esp_camera_init(&config);
 
     if (result != ESP_OK)
     {
@@ -63,10 +64,12 @@ bool CameraService::begin()
         Serial.println(result, HEX);
 
         initialized = false;
+
         return false;
     }
 
-    sensor_t *sensor = esp_camera_sensor_get();
+    sensor_t *sensor =
+        esp_camera_sensor_get();
 
     if (sensor != nullptr)
     {
@@ -79,16 +82,22 @@ bool CameraService::begin()
 
     initialized = true;
 
-    Serial.println("[CAMERA] OV2640 initialized");
+    Serial.println(
+        "[CAMERA] OV2640 initialized");
 
     Serial.print("[CAMERA] PSRAM: ");
-    Serial.println(psramFound() ? "YES" : "NO");
-    
+    Serial.println(
+        psramFound()
+            ? "YES"
+            : "NO");
+
     Serial.print("[CAMERA] Free PSRAM: ");
-    Serial.println(ESP.getFreePsram());
+    Serial.println(
+        ESP.getFreePsram());
 
     Serial.print("[CAMERA] Free Heap: ");
-    Serial.println(ESP.getFreeHeap());
+    Serial.println(
+        ESP.getFreeHeap());
 
     return true;
 }
@@ -97,22 +106,30 @@ CameraFrame CameraService::capture()
 {
     if (!initialized)
     {
-        Serial.println("[CAMERA] Not initialized");
+        Serial.println(
+            "[CAMERA] Not initialized");
+
         return {};
     }
 
     release();
 
-    camera_fb_t *stale = esp_camera_fb_get();
+    camera_fb_t *stale =
+        esp_camera_fb_get();
+
     if (stale != nullptr)
     {
         esp_camera_fb_return(stale);
     }
 
-    currentFrame = esp_camera_fb_get();
+    currentFrame =
+        esp_camera_fb_get();
+
     if (currentFrame == nullptr)
     {
-        Serial.println("[CAMERA] Capture failed");
+        Serial.println(
+            "[CAMERA] Capture failed");
+
         return {};
     }
 
@@ -133,6 +150,8 @@ void CameraService::release()
         return;
     }
 
-    esp_camera_fb_return(currentFrame);
+    esp_camera_fb_return(
+        currentFrame);
+
     currentFrame = nullptr;
 }
