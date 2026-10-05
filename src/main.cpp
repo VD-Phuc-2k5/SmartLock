@@ -14,6 +14,7 @@
 #include "state/LockController.h"
 #include "door/DoorLock.h"
 #include "web/WebConfigService.h"
+#include "camera/CameraService.h"
 
 // ============================================================
 // GLOBAL SERVICES
@@ -30,6 +31,7 @@ OtpService otp;
 RfidService rfid;
 AccessIndicator indicator;
 DoorLock doorLock;
+CameraService camera;
 
 LockController controller(
     lcd,
@@ -52,12 +54,8 @@ bool connectWifi()
     Serial.print("[WIFI] SSID: ");
     Serial.println(networkConfig.ssid);
 
-    // Keep the setup access point available while connecting to the
-    // configured Wi-Fi network.
     WiFi.mode(WIFI_AP_STA);
-    WiFi.begin(
-        networkConfig.ssid.c_str(),
-        networkConfig.password.c_str());
+    WiFi.begin(networkConfig.ssid.c_str(), networkConfig.password.c_str());
 
     unsigned long start = millis();
 
@@ -167,10 +165,40 @@ void setup()
     Serial.println("[SETUP] Indicator OK");
 
     // --------------------------------------------------------
+    // CAMERA
+    // --------------------------------------------------------
+
+    Serial.println("[SETUP] 6. Camera");
+
+    if (!camera.begin())
+    {
+        Serial.println("[SETUP] Camera FAILED");
+    }
+    else
+    {
+        Serial.println("[SETUP] Camera OK");
+
+        CameraFrame frame = camera.capture();
+
+        if (frame.data != nullptr && frame.size > 0)
+        {
+            Serial.print("[SETUP] Camera capture OK: ");
+            Serial.print(frame.size);
+            Serial.println(" bytes");
+        }
+        else
+        {
+            Serial.println("[SETUP] Camera capture FAILED");
+        }
+
+        camera.release();
+    }
+
+    // --------------------------------------------------------
     // DOOR LOCK
     // --------------------------------------------------------
 
-    Serial.println("[SETUP] 6. DoorLock");
+    Serial.println("[SETUP] 7. DoorLock");
 
     doorLock.begin();
 
@@ -180,7 +208,7 @@ void setup()
     // CONTROLLER
     // --------------------------------------------------------
 
-    Serial.println("[SETUP] 7. LockController");
+    Serial.println("[SETUP] 8. LockController");
 
     controller.setState(
         &controller.idleState);
@@ -188,10 +216,10 @@ void setup()
     Serial.println("[SETUP] LockController OK");
 
     // --------------------------------------------------------
-    // MQTT SUBSCRIPTIONS
+    // MQTT
     // --------------------------------------------------------
 
-    Serial.println("[SETUP] 8. MQTT subscriptions");
+    Serial.println("[SETUP] 9. MQTT subscriptions");
 
     mqtt.subscribe(
         AppConfig::Topics::OTP,
@@ -262,23 +290,21 @@ void setup()
     // WIFI
     // --------------------------------------------------------
 
-    Serial.println("[SETUP] 9. WiFi");
+    Serial.println("[SETUP] 10. WiFi");
 
     if (!connectWifi())
     {
-        Serial.println(
-            "[SETUP] WiFi failed");
-
+        Serial.println("[SETUP] WiFi failed");
         return;
     }
 
     Serial.println("[SETUP] WiFi OK");
 
     // --------------------------------------------------------
-    // MQTT
+    // MQTT BEGIN
     // --------------------------------------------------------
 
-    Serial.println("[SETUP] 10. MQTT begin");
+    Serial.println("[SETUP] 11. MQTT begin");
 
     mqtt.begin();
 
@@ -305,7 +331,6 @@ void loop()
     if (!config.hasConfig())
     {
         delay(2);
-
         return;
     }
 

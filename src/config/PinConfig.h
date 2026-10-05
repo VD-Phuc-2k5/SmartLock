@@ -43,4 +43,28 @@ namespace PinConfig
     {
         constexpr uint8_t SERVO = 15;
     }
+
+    namespace Camera
+    {
+        constexpr int8_t PWDN = -1;
+        constexpr int8_t RESET = -1;
+
+        constexpr uint8_t XCLK = 42;
+
+        constexpr uint8_t SIOD = 43;
+        constexpr uint8_t SIOC = 44;
+
+        constexpr uint8_t D0 = 14;
+        constexpr uint8_t D1 = 15;
+        constexpr uint8_t D2 = 16;
+        constexpr uint8_t D3 = 17;
+        constexpr uint8_t D4 = 18;
+        constexpr uint8_t D5 = 19;
+        constexpr uint8_t D6 = 20;
+        constexpr uint8_t D7 = 41;
+
+        constexpr uint8_t VSYNC = 47;
+        constexpr uint8_t HREF = 48;
+        constexpr uint8_t PCLK = 45;
+    }
 }
