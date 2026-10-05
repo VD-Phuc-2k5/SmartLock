@@ -8,7 +8,7 @@ namespace PinConfig
     {
         constexpr uint8_t R1 = 41;
         constexpr uint8_t R2 = 42;
-        constexpr uint8_t R3 = 36;
+        constexpr uint8_t R3 = 45;
         constexpr uint8_t R4 = 0;
 
         constexpr uint8_t C1 = 48;
@@ -28,7 +28,7 @@ namespace PinConfig
         constexpr uint8_t SS = 40;
         constexpr uint8_t RST = 35;
         constexpr uint8_t SCK = 39;
-        constexpr uint8_t MISO = 37;
+        constexpr uint8_t MISO = 46;
         constexpr uint8_t MOSI = 38;
     }
 
