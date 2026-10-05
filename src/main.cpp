@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <cstring>
 #include <WiFi.h>
+#include <HTTPClient.h>
 
 #include "config/AppConfig.h"
 #include "config/ConfigManager.h"
@@ -81,6 +82,75 @@ bool connectWifi()
     Serial.println(WiFi.localIP());
 
     return true;
+}
+
+// ============================================================
+// CAMERA UPLOAD
+// ============================================================
+
+bool uploadCameraFrame(const uint8_t *data, size_t size)
+{
+    if (data == nullptr || size == 0)
+    {
+        Serial.println("[CAMERA] Invalid frame");
+        return false;
+    }
+
+    if (WiFi.status() != WL_CONNECTED)
+    {
+        Serial.println("[CAMERA] WiFi not connected");
+        return false;
+    }
+
+    const NetworkConfig &networkConfig = config.get();
+
+    String url =
+        "http://" +
+        networkConfig.mqttHost +
+        ":" +
+        String(AppConfig::Camera::SERVER_PORT) +
+        AppConfig::Camera::SERVER_PATH;
+
+    Serial.print("[CAMERA] POST ");
+    Serial.println(url);
+
+    WiFiClient client;
+    HTTPClient http;
+
+    http.setConnectTimeout(AppConfig::Camera::HTTP_TIMEOUT_MS);
+    http.setTimeout(AppConfig::Camera::HTTP_TIMEOUT_MS);
+
+    if (!http.begin(client, url))
+    {
+        Serial.println("[CAMERA] HTTP begin FAILED");
+        return false;
+    }
+
+    http.addHeader("Content-Type", "image/jpeg");
+
+    int httpCode = http.sendRequest("POST", const_cast<uint8_t *>(data), size);
+
+    Serial.print("[CAMERA] HTTP status: ");
+    Serial.println(httpCode);
+
+    if (httpCode > 0)
+    {
+        String response = http.getString();
+        Serial.print("[CAMERA] Server response: ");
+        Serial.println(response);
+    }
+    else
+    {
+        Serial.print("[CAMERA] HTTP error: ");
+        Serial.println(http.errorToString(httpCode));
+    }
+
+    http.end();
+
+    return (
+        httpCode >= 200 &&
+        httpCode < 300
+    );
 }
 
 // ============================================================
@@ -335,6 +405,9 @@ void loop()
     }
 
     mqtt.loop();
+    // --------------------------------------------------------
+    // RFID
+    // --------------------------------------------------------
 
     if (rfid.isCardPresent())
     {
@@ -346,11 +419,51 @@ void loop()
         controller.onCard(uid);
     }
 
+    // --------------------------------------------------------
+    // KEYPAD
+    // --------------------------------------------------------
     char key = keypad.readkey();
     if (key != NO_KEY)
     {
         Serial.print("[KEYPAD] Key: ");
         Serial.println(key);
+
+        // ----------------------------------------------------
+        // C = CAMERA CAPTURE
+        // ----------------------------------------------------
+
+        if (key == 'C')
+        {
+            Serial.println("[CAMERA] Capture requested");
+
+            CameraFrame frame =camera.capture();
+
+            if (frame.data != nullptr && frame.size > 0)
+            {
+                Serial.print("[CAMERA] Uploading ");
+                Serial.print(frame.size);
+                Serial.println(" bytes...");
+
+                bool uploaded = uploadCameraFrame(frame.data, frame.size);
+
+                if (uploaded)
+                {
+                    Serial.println("[CAMERA] Upload OK");
+                }
+                else
+                {
+                    Serial.println("[CAMERA] Upload FAILED");
+                }
+            }
+            else
+            {
+                Serial.println("[CAMERA] Capture FAILED");
+            }
+
+            camera.release();
+            return;
+        }
+
         controller.onKey(key);
     }
 }

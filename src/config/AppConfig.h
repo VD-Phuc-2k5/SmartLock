@@ -13,13 +13,18 @@ namespace AppConfig
 
     namespace Mqtt
     {
-        // constexpr char BROKER[] = "host.wokwi.internal";
-        // constexpr char BROKER[] = "192.168.1.105";
         constexpr uint16_t PORT = 1883;
         constexpr char CLIENT_ID[] = "smartlock-esp32-01";
         constexpr uint32_t RECONNECT_INTERVAL_MS = 5000;
         constexpr uint8_t MAX_SUBSCRIPTIONS = 4;
         constexpr unsigned long DELAY_MS = 500;
+    }
+
+    namespace Camera
+    {
+        constexpr uint16_t SERVER_PORT = 3001;
+        constexpr char SERVER_PATH[] = "/api/camera/frame";
+        constexpr uint32_t HTTP_TIMEOUT_MS = 10000;
     }
 
     namespace Otp

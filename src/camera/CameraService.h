@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ICamera.h"
+#include <esp_camera.h>
 
 class CameraService : public ICamera
 {
@@ -11,4 +12,5 @@ public:
 
 private:
     bool initialized = false;
+    camera_fb_t *currentFrame = nullptr;
 };

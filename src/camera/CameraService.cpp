@@ -39,8 +39,8 @@ bool CameraService::begin()
     if (psramFound())
     {
         config.frame_size = FRAMESIZE_VGA;
-        config.jpeg_quality = 10;
-        config.fb_count = 2;
+        config.jpeg_quality = 8;
+        config.fb_count = 1;
         config.fb_location = CAMERA_FB_IN_PSRAM;
         config.grab_mode = CAMERA_GRAB_LATEST;
     }
@@ -95,32 +95,36 @@ CameraFrame CameraService::capture()
         return {};
     }
 
-    camera_fb_t *frame = esp_camera_fb_get();
+    if (currentFrame != nullptr)
+    {
+        esp_camera_fb_return(currentFrame);
+        currentFrame = nullptr;
+    }
 
-    if (frame == nullptr)
+    currentFrame = esp_camera_fb_get();
+    if (currentFrame == nullptr)
     {
         Serial.println("[CAMERA] Capture failed");
         return {};
     }
 
     Serial.print("[CAMERA] Captured ");
-    Serial.print(frame->len);
+    Serial.print(currentFrame->len);
     Serial.println(" bytes");
 
     return {
-        .data = frame->buf,
-        .size = frame->len
+        .data = currentFrame->buf,
+        .size = currentFrame->len
     };
 }
 
 void CameraService::release()
 {
-    if (!initialized)
+    if (currentFrame == nullptr)
     {
         return;
     }
 
-    esp_camera_fb_return(
-        esp_camera_fb_get()
-    );
+    esp_camera_fb_return(currentFrame);
+    currentFrame = nullptr;
 }
