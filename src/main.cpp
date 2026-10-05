@@ -64,13 +64,14 @@ bool connectWifi()
         networkConfig.ssid.c_str(),
         networkConfig.password.c_str());
 
-    unsigned long start = millis();
+    const unsigned long start = millis();
 
     while (
         WiFi.status() != WL_CONNECTED &&
         millis() - start < AppConfig::Wifi::TIMEOUT_MS)
     {
         delay(500);
+
         Serial.print(".");
     }
 
@@ -86,6 +87,9 @@ bool connectWifi()
 
     Serial.print("[WIFI] IP: ");
     Serial.println(WiFi.localIP());
+
+    Serial.print("[WIFI] RSSI: ");
+    Serial.println(WiFi.RSSI());
 
     return true;
 }
@@ -141,7 +145,7 @@ bool uploadCameraFrame(
         "Content-Type",
         "image/jpeg");
 
-    int httpCode =
+    const int httpCode =
         http.sendRequest(
             "POST",
             const_cast<uint8_t *>(data),
@@ -187,12 +191,12 @@ void setup()
     Serial.println("================================");
 
     // --------------------------------------------------------
-    // CONFIG
+    // 1. CONFIG
     // --------------------------------------------------------
 
     Serial.println("[SETUP] 1. ConfigManager");
 
-    bool hasConfig = config.begin();
+    const bool hasConfig = config.begin();
 
     if (hasConfig)
     {
@@ -215,7 +219,126 @@ void setup()
     }
 
     // --------------------------------------------------------
-    // SETUP AP MODE
+    // 2. KEYPAD
+    // --------------------------------------------------------
+
+    Serial.println("[SETUP] 2. Keypad");
+
+    keypad.begin();
+
+    Serial.println("[SETUP] Keypad OK");
+
+    // --------------------------------------------------------
+    // 3. LCD
+    // --------------------------------------------------------
+
+    Serial.println("[SETUP] 3. LCD");
+
+    lcd.begin();
+
+    Serial.println("[SETUP] LCD OK");
+
+    // --------------------------------------------------------
+    // 4. RFID
+    // --------------------------------------------------------
+
+    Serial.println("[SETUP] 4. RFID");
+
+    rfid.begin();
+
+    Serial.println("[SETUP] RFID OK");
+
+    // --------------------------------------------------------
+    // 5. INDICATOR
+    // --------------------------------------------------------
+
+    Serial.println("[SETUP] 5. Indicator");
+
+    indicator.begin();
+
+    Serial.println("[SETUP] Indicator OK");
+
+    // --------------------------------------------------------
+    // 6. DOOR LOCK
+    // --------------------------------------------------------
+
+    Serial.println("[SETUP] 6. DoorLock");
+
+    doorLock.begin();
+
+    Serial.println("[SETUP] DoorLock OK");
+
+    // --------------------------------------------------------
+    // 7. LOCK CONTROLLER
+    // --------------------------------------------------------
+
+    Serial.println("[SETUP] 7. LockController");
+
+    controller.setState(
+        &controller.idleState);
+
+    Serial.println("[SETUP] LockController OK");
+
+    // --------------------------------------------------------
+    // 8. MQTT SUBSCRIPTIONS
+    // --------------------------------------------------------
+
+    Serial.println(
+        "[SETUP] 8. MQTT subscriptions");
+
+    mqtt.subscribe(
+        AppConfig::Topics::OTP,
+        [](const char *payload,
+           unsigned int length)
+        {
+            otp.setOtp(
+                payload,
+                length);
+
+            controller.onOtpReceived();
+        });
+
+    Serial.println(
+        "[SETUP] OTP subscription OK");
+
+    mqtt.subscribe(
+        AppConfig::Topics::CARD_VERIFY_RESULT,
+        [](const char *payload,
+           unsigned int length)
+        {
+            const bool valid =
+                length == 5 &&
+                std::strncmp(
+                    payload,
+                    "valid",
+                    5) == 0;
+
+            controller.onVerifyResult(valid);
+        });
+
+    Serial.println(
+        "[SETUP] Card verify subscription OK");
+
+    mqtt.subscribe(
+        AppConfig::Topics::CARD_ENROLL_RESULT,
+        [](const char *payload,
+           unsigned int length)
+        {
+            const bool ok =
+                length == 2 &&
+                std::strncmp(
+                    payload,
+                    "ok",
+                    2) == 0;
+
+            controller.onEnrollResult(ok);
+        });
+
+    Serial.println(
+        "[SETUP] Card enroll subscription OK");
+
+    // --------------------------------------------------------
+    // 9. WEB CONFIGURATION
     // --------------------------------------------------------
 
     if (!hasConfig)
@@ -246,165 +369,6 @@ void setup()
         return;
     }
 
-    // --------------------------------------------------------
-    // KEYPAD
-    // --------------------------------------------------------
-
-    Serial.println("[SETUP] 2. Keypad");
-
-    keypad.begin();
-
-    Serial.println("[SETUP] Keypad OK");
-
-    // --------------------------------------------------------
-    // LCD
-    // --------------------------------------------------------
-
-    Serial.println("[SETUP] 3. LCD");
-
-    lcd.begin();
-
-    Serial.println("[SETUP] LCD OK");
-
-    // --------------------------------------------------------
-    // RFID
-    // --------------------------------------------------------
-
-    Serial.println("[SETUP] 4. RFID");
-
-    rfid.begin();
-
-    Serial.println("[SETUP] RFID OK");
-
-    // --------------------------------------------------------
-    // INDICATOR
-    // --------------------------------------------------------
-
-    Serial.println("[SETUP] 5. Indicator");
-
-    indicator.begin();
-
-    Serial.println("[SETUP] Indicator OK");
-
-    // --------------------------------------------------------
-    // CAMERA
-    // --------------------------------------------------------
-
-    Serial.println("[SETUP] 6. Camera");
-
-    if (!camera.begin())
-    {
-        Serial.println("[SETUP] Camera FAILED");
-    }
-    else
-    {
-        Serial.println("[SETUP] Camera OK");
-
-        CameraFrame frame = camera.capture();
-
-        if (
-            frame.data != nullptr &&
-            frame.size > 0)
-        {
-            Serial.print(
-                "[SETUP] Camera capture OK: ");
-
-            Serial.print(frame.size);
-
-            Serial.println(" bytes");
-        }
-        else
-        {
-            Serial.println(
-                "[SETUP] Camera capture FAILED");
-        }
-
-        camera.release();
-    }
-
-    // --------------------------------------------------------
-    // DOOR LOCK
-    // --------------------------------------------------------
-
-    Serial.println("[SETUP] 7. DoorLock");
-
-    doorLock.begin();
-
-    Serial.println("[SETUP] DoorLock OK");
-
-    // --------------------------------------------------------
-    // CONTROLLER
-    // --------------------------------------------------------
-
-    Serial.println("[SETUP] 8. LockController");
-
-    controller.setState(
-        &controller.idleState);
-
-    Serial.println("[SETUP] LockController OK");
-
-    // --------------------------------------------------------
-    // MQTT SUBSCRIPTIONS
-    // --------------------------------------------------------
-
-    Serial.println(
-        "[SETUP] 9. MQTT subscriptions");
-
-    mqtt.subscribe(
-        AppConfig::Topics::OTP,
-        [](const char *payload,
-           unsigned int length)
-        {
-            otp.setOtp(
-                payload,
-                length);
-
-            controller.onOtpReceived();
-        });
-
-    Serial.println(
-        "[SETUP] OTP subscription OK");
-
-    mqtt.subscribe(
-        AppConfig::Topics::CARD_VERIFY_RESULT,
-        [](const char *payload,
-           unsigned int length)
-        {
-            bool valid =
-                length == 5 &&
-                std::strncmp(
-                    payload,
-                    "valid",
-                    5) == 0;
-
-            controller.onVerifyResult(valid);
-        });
-
-    Serial.println(
-        "[SETUP] Card verify subscription OK");
-
-    mqtt.subscribe(
-        AppConfig::Topics::CARD_ENROLL_RESULT,
-        [](const char *payload,
-           unsigned int length)
-        {
-            bool ok =
-                length == 2 &&
-                std::strncmp(
-                    payload,
-                    "ok",
-                    2) == 0;
-
-            controller.onEnrollResult(ok);
-        });
-
-    Serial.println(
-        "[SETUP] Card enroll subscription OK");
-
-    // --------------------------------------------------------
-    // WEB CONFIGURATION SERVER
-    // --------------------------------------------------------
-
     Serial.println(
         "[SETUP] Starting WebConfigService...");
 
@@ -420,7 +384,10 @@ void setup()
     }
 
     // --------------------------------------------------------
-    // WIFI
+    // 10. WIFI
+    //
+    // IMPORTANT:
+    // Camera is NOT initialized before WiFi.
     // --------------------------------------------------------
 
     Serial.println("[SETUP] 10. WiFi");
@@ -428,7 +395,7 @@ void setup()
     if (!connectWifi())
     {
         Serial.println(
-            "[SETUP] WiFi failed");
+            "[SETUP] WiFi FAILED");
 
         return;
     }
@@ -436,10 +403,41 @@ void setup()
     Serial.println("[SETUP] WiFi OK");
 
     // --------------------------------------------------------
-    // MQTT BEGIN
+    // 11. CAMERA
+    //
+    // Initialize camera only after WiFi is completely ready.
     // --------------------------------------------------------
 
-    Serial.println("[SETUP] 11. MQTT begin");
+    Serial.println("[SETUP] 11. Camera");
+
+    if (!camera.begin())
+    {
+        Serial.println("[SETUP] Camera FAILED");
+    }
+    else
+    {
+        Serial.println("[SETUP] Camera OK");
+
+        Serial.print("[CAMERA] PSRAM: ");
+        Serial.println(
+            psramFound()
+                ? "YES"
+                : "NO");
+
+        Serial.print("[CAMERA] Free PSRAM: ");
+        Serial.println(
+            ESP.getFreePsram());
+
+        Serial.print("[CAMERA] Free Heap: ");
+        Serial.println(
+            ESP.getFreeHeap());
+    }
+
+    // --------------------------------------------------------
+    // 12. MQTT
+    // --------------------------------------------------------
+
+    Serial.println("[SETUP] 12. MQTT begin");
 
     mqtt.begin();
 
@@ -447,17 +445,14 @@ void setup()
         "[SETUP] MQTT begin returned");
 
     // --------------------------------------------------------
-    // SETUP FINISHED
+    // DONE
     // --------------------------------------------------------
 
     Serial.println();
-
     Serial.println(
         "================================");
-
     Serial.println(
-        "   [MAIN] Smart Lock started");
-
+        "   SMART LOCK READY");
     Serial.println(
         "================================");
 }
@@ -472,11 +467,15 @@ void loop()
 
     if (!config.hasConfig())
     {
-        delay(2);
+        delay(10);
         return;
     }
 
     mqtt.loop();
+
+    // --------------------------------------------------------
+    // RFID
+    // --------------------------------------------------------
 
     if (rfid.isCardPresent())
     {
@@ -488,7 +487,11 @@ void loop()
         controller.onCard(uid);
     }
 
-    char key = keypad.readkey();
+    // --------------------------------------------------------
+    // KEYPAD
+    // --------------------------------------------------------
+
+    const char key = keypad.readkey();
 
     if (key != NO_KEY)
     {
@@ -512,10 +515,9 @@ void loop()
 
                 Serial.print(frame.size);
 
-                Serial.println(
-                    " bytes...");
+                Serial.println(" bytes...");
 
-                bool uploaded =
+                const bool uploaded =
                     uploadCameraFrame(
                         frame.data,
                         frame.size);
@@ -538,10 +540,12 @@ void loop()
             }
 
             camera.release();
-
-            return;
         }
-
-        controller.onKey(key);
+        else
+        {
+            controller.onKey(key);
+        }
     }
+
+    delay(2);
 }
