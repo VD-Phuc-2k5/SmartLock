@@ -26,7 +26,7 @@ namespace PinConfig
     namespace Rfid
     {
         constexpr uint8_t SS = 40;
-        constexpr uint8_t RST = 35;
+        constexpr uint8_t RST = 0xFF;
         constexpr uint8_t SCK = 39;
         constexpr uint8_t MISO = 46;
         constexpr uint8_t MOSI = 38;
