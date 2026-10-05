@@ -6,15 +6,15 @@ namespace PinConfig
 {
     namespace Keypad
     {
-        constexpr uint8_t R1 = 43;
-        constexpr uint8_t R2 = 44;
-        constexpr uint8_t R3 = 45;
-        constexpr uint8_t R4 = 46;
+        constexpr uint8_t R1 = 41;
+        constexpr uint8_t R2 = 42;
+        constexpr uint8_t R3 = 36;
+        constexpr uint8_t R4 = 0;
 
-        constexpr uint8_t C1 = 47;
-        constexpr uint8_t C2 = 48;
-        constexpr uint8_t C3 = 19;
-        constexpr uint8_t C4 = 20;
+        constexpr uint8_t C1 = 48;
+        constexpr uint8_t C2 = 47;
+        constexpr uint8_t C3 = 20;
+        constexpr uint8_t C4 = 19;
     }
 
     namespace Lcd

@@ -349,6 +349,8 @@ void loop()
     char key = keypad.readkey();
     if (key != NO_KEY)
     {
+        Serial.print("[KEYPAD] Key: ");
+        Serial.println(key);
         controller.onKey(key);
     }
 }
