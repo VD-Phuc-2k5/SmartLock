@@ -20,6 +20,7 @@ const otpService = new OtpService(generator, store, config.otp.ttlMs);
 const mqttClient = new MqttClient(config.mqtt.brokerUrl);
 
 const mailer = new SmtpMailer(config.smtp, config.email.from);
+
 const notifier = new CompositeNotifier([
     new MqttNotifier(mqttClient),
     new EmailNotifier(mailer, config.email.subject),
@@ -28,6 +29,7 @@ const notifier = new CompositeNotifier([
 const cardStore = new JsonFileCardStore(config.card.filePath);
 const cardService = new CardService(cardStore);
 const cardEvents = new CardEventBus();
+
 let latestCameraFrame: Buffer | null = null;
 
 await mqttClient.connect();
@@ -40,63 +42,139 @@ mqttClient.onMessage((topic, message) => {
     void handleMqttMessage(topic, message);
 });
 
-async function handleMqttMessage(topic: string, message: string): Promise<void> {
+async function handleMqttMessage(
+    topic: string,
+    message: string,
+): Promise<void> {
     try {
         const deviceId = extractDeviceId(topic);
+
         if (!deviceId) {
             return;
         }
 
+        // =====================================================
+        // OTP REQUEST
+        // =====================================================
+
         if (topic.endsWith('/otp/request')) {
-            const record = otpService.issue(deviceId, config.email.to);
+            const record = otpService.issue(
+                deviceId,
+                config.email.to,
+            );
+
             await notifier.notify(record);
-            console.log(`[OTP] requested by ${deviceId}, sent to ${config.email.to}`);
+
+            console.log(
+                `[OTP] requested by ${deviceId}, sent to ${config.email.to}`,
+            );
+
             return;
         }
+
+        // =====================================================
+        // CARD ENROLL
+        // =====================================================
 
         if (topic.endsWith('/card/enroll')) {
             const result = await cardService.enroll(message);
-            mqttClient.publish(Topics.cardEnrollResult(deviceId), result);
-            console.log(`[CARD] enroll ${deviceId} uid=${message} -> ${result}`);
+
+            mqttClient.publish(
+                Topics.cardEnrollResult(deviceId),
+                result,
+            );
+
+            console.log(
+                `[CARD] enroll ${deviceId} uid=${message} -> ${result}`,
+            );
+
             if (result === 'ok') {
-                cardEvents.publish(await cardService.list());
+                cardEvents.publish(
+                    await cardService.list(),
+                );
             }
+
             return;
         }
 
+        // =====================================================
+        // CARD VERIFY
+        // =====================================================
+
         if (topic.endsWith('/card/verify')) {
-            const valid = await cardService.verify(message);
-            mqttClient.publish(Topics.cardVerifyResult(deviceId), valid ? 'valid' : 'invalid');
-            console.log(`[CARD] verify ${deviceId} uid=${message} -> ${valid ? 'valid' : 'invalid'}`);
+            const valid =
+                await cardService.verify(message);
+
+            mqttClient.publish(
+                Topics.cardVerifyResult(deviceId),
+                valid ? 'valid' : 'invalid',
+            );
+
+            console.log(
+                `[CARD] verify ${deviceId} uid=${message} -> ${
+                    valid ? 'valid' : 'invalid'
+                }`,
+            );
 
             if (valid) {
-                const card = await cardService.find(message);
+                const card =
+                    await cardService.find(message);
+
                 const email = card?.email;
+
                 if (email) {
-                    const record = otpService.issue(deviceId, email);
+                    const record =
+                        otpService.issue(
+                            deviceId,
+                            email,
+                        );
+
                     await notifier.notify(record);
-                    console.log(`[OTP] access OTP sent to ${email} for device=${deviceId}`);
+
+                    console.log(
+                        `[OTP] access OTP sent to ${email} for device=${deviceId}`,
+                    );
                 }
             }
+
             return;
         }
     } catch (err) {
-        console.error('[MQTT] handler error:', err);
+        console.error(
+            '[MQTT] handler error:',
+            err,
+        );
     }
 }
 
+// ============================================================
+// HTTP
+// ============================================================
+
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods':
+        'GET, POST, PUT, OPTIONS',
+    'Access-Control-Allow-Headers':
+        'Content-Type',
 };
 
-function sendJson(res: http.ServerResponse, status: number, body: unknown): void {
-    res.writeHead(status, { 'Content-Type': 'application/json', ...corsHeaders });
+function sendJson(
+    res: http.ServerResponse,
+    status: number,
+    body: unknown,
+): void {
+    res.writeHead(status, {
+        'Content-Type': 'application/json',
+        ...corsHeaders,
+    });
+
     res.end(JSON.stringify(body));
 }
 
-function readBody(req: http.IncomingMessage): Promise<string> {
+function readBody(
+    req: http.IncomingMessage,
+): Promise<string> {
     return new Promise((resolve, reject) => {
         let data = '';
 
@@ -115,29 +193,38 @@ function readBody(req: http.IncomingMessage): Promise<string> {
     });
 }
 
-function readBinaryBody(req: http.IncomingMessage): Promise<Buffer> {
+function readBinaryBody(
+    req: http.IncomingMessage,
+): Promise<Buffer> {
     return new Promise((resolve, reject) => {
         const chunks: Buffer[] = [];
         let totalSize = 0;
 
-        req.on('data', (chunk: Buffer) => {
-            totalSize += chunk.length;
+        req.on(
+            'data',
+            (chunk: Buffer) => {
+                totalSize += chunk.length;
 
-            if (totalSize > config.camera.maxUploadBytes) {
-                reject(
-                    new Error(
-                        'camera image too large',
-                    ),
+                if (
+                    totalSize >
+                    config.camera.maxUploadBytes
+                ) {
+                    reject(
+                        new Error(
+                            'camera image too large',
+                        ),
+                    );
+
+                    req.destroy();
+
+                    return;
+                }
+
+                chunks.push(
+                    Buffer.from(chunk),
                 );
-
-                req.destroy();
-                return;
-            }
-
-            chunks.push(
-                Buffer.from(chunk),
-            );
-        });
+            },
+        );
 
         req.on('end', () => {
             resolve(
@@ -149,29 +236,42 @@ function readBinaryBody(req: http.IncomingMessage): Promise<Buffer> {
     });
 }
 
-function parseJson(body: string): Record<string, unknown> {
+function parseJson(
+    body: string,
+): Record<string, unknown> {
     if (!body) {
         return {};
     }
+
     return JSON.parse(body);
 }
 
-function parseCards(value: unknown): Card[] | null {
+function parseCards(
+    value: unknown,
+): Card[] | null {
     if (!Array.isArray(value)) {
         return null;
     }
 
     const cards: Card[] = [];
+
     for (const item of value) {
-        if (!item || typeof item !== 'object') {
+        if (
+            !item ||
+            typeof item !== 'object'
+        ) {
             return null;
         }
-        const { uid, email } = item as {
-            uid?: unknown;
-            email?: unknown;
-        };
 
-        if (typeof uid !== 'string' || !uid
+        const { uid, email } =
+            item as {
+                uid?: unknown;
+                email?: unknown;
+            };
+
+        if (
+            typeof uid !== 'string' ||
+            !uid
         ) {
             return null;
         }
@@ -192,9 +292,17 @@ function parseCards(value: unknown): Card[] | null {
     return cards;
 }
 
+// ============================================================
+// HTTP SERVER
+// ============================================================
+
 const server =
     http.createServer(
         async (req, res) => {
+            // ==================================================
+            // CORS
+            // ==================================================
+
             if (
                 req.method === 'OPTIONS'
             ) {
@@ -204,8 +312,13 @@ const server =
                 );
 
                 res.end();
+
                 return;
             }
+
+            // ==================================================
+            // GET /api/cards
+            // ==================================================
 
             if (
                 req.method === 'GET' &&
@@ -223,16 +336,88 @@ const server =
                 return;
             }
 
+            // ==================================================
+            // PUT /api/cards
+            // Client gửi toàn bộ danh sách cards
+            // để cập nhật email
+            // ==================================================
+
+            if (
+                req.method === 'PUT' &&
+                req.url === '/api/cards'
+            ) {
+                try {
+                    const body =
+                        await readBody(req);
+
+                    const parsed =
+                        parseJson(body);
+
+                    const cards =
+                        parseCards(
+                            parsed.cards,
+                        );
+
+                    if (!cards) {
+                        sendJson(
+                            res,
+                            400,
+                            {
+                                error:
+                                    'invalid cards',
+                            },
+                        );
+
+                        return;
+                    }
+
+                    await cardService.update(
+                        cards,
+                    );
+
+                    cardEvents.publish(
+                        cards,
+                    );
+
+                    sendJson(
+                        res,
+                        200,
+                        { cards },
+                    );
+                } catch (error) {
+                    console.error(
+                        '[CARD] update error:',
+                        error,
+                    );
+
+                    sendJson(
+                        res,
+                        500,
+                        {
+                            error:
+                                'failed to update cards',
+                        },
+                    );
+                }
+
+                return;
+            }
+
+            // ==================================================
+            // GET /api/cards/events
+            // ==================================================
+
             if (
                 req.method === 'GET' &&
-                req.url === '/api/cards/events'
+                req.url ===
+                    '/api/cards/events'
             ) {
                 res.writeHead(200, {
                     'Content-Type':
                         'text/event-stream',
                     'Cache-Control':
                         'no-cache',
-                    'Connection':
+                    Connection:
                         'keep-alive',
                     ...corsHeaders,
                 });
@@ -245,7 +430,9 @@ const server =
                     cards: Card[],
                 ) => {
                     res.write(
-                        `data: ${JSON.stringify({ cards })}\n\n`,
+                        `data: ${JSON.stringify({
+                            cards,
+                        })}\n\n`,
                     );
                 };
 
@@ -254,7 +441,9 @@ const server =
                 );
 
                 const unsubscribe =
-                    cardEvents.subscribe(send);
+                    cardEvents.subscribe(
+                        send,
+                    );
 
                 req.on(
                     'close',
@@ -266,9 +455,14 @@ const server =
                 return;
             }
 
+            // ==================================================
+            // POST /api/camera/frame
+            // ==================================================
+
             if (
                 req.method === 'POST' &&
-                req.url === '/api/camera/frame'
+                req.url ===
+                    '/api/camera/frame'
             ) {
                 try {
                     const contentType =
@@ -293,7 +487,9 @@ const server =
                     }
 
                     const frame =
-                        await readBinaryBody(req);
+                        await readBinaryBody(
+                            req,
+                        );
 
                     if (
                         frame.length === 0
@@ -344,9 +540,14 @@ const server =
                 return;
             }
 
+            // ==================================================
+            // GET /api/camera/frame
+            // ==================================================
+
             if (
                 req.method === 'GET' &&
-                req.url === '/api/camera/frame'
+                req.url ===
+                    '/api/camera/frame'
             ) {
                 if (
                     latestCameraFrame === null
@@ -379,6 +580,10 @@ const server =
 
                 return;
             }
+
+            // ==================================================
+            // POST /api/otp
+            // ==================================================
 
             if (
                 req.method === 'POST' &&
@@ -453,7 +658,9 @@ const server =
                 );
 
                 console.log(
-                    `[OTP] device=${deviceId} email=${email} code=${record.code} expiresAt=${new Date(record.expiresAt).toISOString()}`,
+                    `[OTP] device=${deviceId} email=${email} code=${record.code} expiresAt=${new Date(
+                        record.expiresAt,
+                    ).toISOString()}`,
                 );
 
                 sendJson(
@@ -468,6 +675,10 @@ const server =
 
                 return;
             }
+
+            // ==================================================
+            // POST /api/otp/verify
+            // ==================================================
 
             if (
                 req.method === 'POST' &&
@@ -531,6 +742,10 @@ const server =
                 return;
             }
 
+            // ==================================================
+            // 404
+            // ==================================================
+
             sendJson(
                 res,
                 404,
@@ -540,6 +755,10 @@ const server =
             );
         },
     );
+
+// ============================================================
+// START SERVER
+// ============================================================
 
 server.listen(
     config.http.port,

@@ -3,108 +3,28 @@
 
 MqttClient::MqttClient(
     ConfigManager &manager)
-    : configManager(manager),
-      mqttClient(wifiClient)
+    : configManager(manager)
 {
 }
 
 void MqttClient::begin()
 {
-    if (!configManager.hasConfig())
-    {
-        Serial.println(
-            "[MQTT] No network configuration");
+    Serial.println("[MQTT] Starting Serial MQTT transport...");
 
-        return;
-    }
+    serialTransport.begin();
 
-    const NetworkConfig &config =
-        configManager.get();
-
-    Serial.println("Connected to WiFi");
-
-    Serial.print("ESP32 IP: ");
-    Serial.println(WiFi.localIP());
-
-    Serial.print("Gateway: ");
-    Serial.println(WiFi.gatewayIP());
-
-    Serial.print("MQTT Broker: ");
-    Serial.print(config.mqttHost);
-
-    Serial.print(":");
-    Serial.println(config.mqttPort);
-
-    mqttClient.setServer(
-        config.mqttHost.c_str(),
-        config.mqttPort
-    );
-
-    mqttClient.setCallback(
-        [this](
-            char *topic,
-            byte *payload,
-            unsigned int length)
-        {
-            onMessage(
-                topic,
-                payload,
-                length);
-        }
-    );
-
-    connect();
+    Serial.println("[MQTT] Serial MQTT transport ready");
 }
 
 void MqttClient::loop()
 {
-    if (!configManager.hasConfig())
-    {
-        return;
-    }
-
-    if (!mqttClient.connected())
-    {
-        uint32_t now = millis();
-
-        if (
-            now - lastReconnectAttempt >=
-            AppConfig::Mqtt::RECONNECT_INTERVAL_MS)
+    serialTransport.loop(
+        [this](
+            const char *topic,
+            const char *payload)
         {
-            lastReconnectAttempt = now;
-
-            connect();
-        }
-
-        return;
-    }
-
-    mqttClient.loop();
-}
-
-void MqttClient::connect()
-{
-    Serial.println("Connecting to MQTT broker...");
-
-    if (mqttClient.connect(AppConfig::Mqtt::CLIENT_ID))
-    {
-        Serial.println("Connected to MQTT broker");
-
-        for (
-            uint8_t i = 0;
-            i < subscriptionCount;
-            i++
-        )
-        {
-            mqttClient.subscribe(
-                subscriptions[i].topic);
-        }
-    }
-    else
-    {
-        Serial.print("Failed to connect to MQTT broker, rc=");
-        Serial.println(mqttClient.state());
-    }
+            onMessage(topic, payload);
+        });
 }
 
 bool MqttClient::subscribe(
@@ -115,40 +35,37 @@ bool MqttClient::subscribe(
         subscriptionCount >=
         AppConfig::Mqtt::MAX_SUBSCRIPTIONS)
     {
+        Serial.println(
+            "[MQTT] Subscription limit reached");
+
         return false;
     }
 
-    subscriptions[subscriptionCount] = {topic, handler};
+    subscriptions[subscriptionCount] = {
+        topic,
+        handler
+    };
 
     subscriptionCount++;
 
-    if (mqttClient.connected())
-    {
-        mqttClient.subscribe(topic);
-    }
+    Serial.print("[MQTT] Subscribed: ");
+    Serial.println(topic);
 
     return true;
 }
 
 bool MqttClient::publish(
     const char *topic,
-    const char *message
-)
+    const char *message)
 {
-    if (!mqttClient.connected())
-    {
-        return false;
-    }
-
-    return mqttClient.publish(
+    return serialTransport.publish(
         topic,
         message);
 }
 
 void MqttClient::onMessage(
-    char *topic,
-    byte *payload,
-    unsigned int length)
+    const char *topic,
+    const char *payload)
 {
     for (
         uint8_t i = 0;
@@ -161,11 +78,13 @@ void MqttClient::onMessage(
                 subscriptions[i].topic) == 0)
         {
             subscriptions[i].handler(
-                reinterpret_cast<const char *>(
-                    payload),
-                length);
+                payload,
+                std::strlen(payload));
 
             return;
         }
     }
+
+    Serial.print("[MQTT] No handler for topic: ");
+    Serial.println(topic);
 }

@@ -7,6 +7,12 @@
 
 bool CameraService::begin()
 {
+    if (initialized)
+    {
+        Serial.println("[CAMERA] Already initialized");
+        return true;
+    }
+
     camera_config_t config{};
 
     config.ledc_channel = LEDC_CHANNEL_0;
@@ -54,7 +60,7 @@ bool CameraService::begin()
 
     Serial.println("[CAMERA] Initializing OV2640...");
 
-    esp_err_t result = esp_camera_init(&config);
+    const esp_err_t result = esp_camera_init(&config);
 
     if (result != ESP_OK)
     {
@@ -62,6 +68,8 @@ bool CameraService::begin()
         Serial.println(result, HEX);
 
         initialized = false;
+        currentFrame = nullptr;
+
         return false;
     }
 
@@ -83,6 +91,7 @@ bool CameraService::begin()
     }
 
     initialized = true;
+    currentFrame = nullptr;
 
     Serial.println("[CAMERA] OV2640 initialized");
 
@@ -111,15 +120,36 @@ CameraFrame CameraService::capture()
         return {};
     }
 
-    release();
+    if (currentFrame != nullptr)
+    {
+        Serial.println(
+            "[CAMERA] Releasing previous frame");
+
+        release();
+    }
 
     Serial.println("[CAMERA] Capturing frame...");
 
-    currentFrame = esp_camera_fb_get();
+    camera_fb_t *frame = esp_camera_fb_get();
 
-    if (currentFrame == nullptr)
+    if (frame == nullptr)
     {
-        Serial.println("[CAMERA] Capture failed");
+        Serial.println(
+            "[CAMERA] Capture failed: esp_camera_fb_get() returned NULL");
+
+        return {};
+    }
+
+    currentFrame = frame;
+
+    if (currentFrame->buf == nullptr ||
+        currentFrame->len == 0)
+    {
+        Serial.println(
+            "[CAMERA] Invalid framebuffer");
+
+        release();
+
         return {};
     }
 
@@ -139,6 +169,8 @@ void CameraService::release()
     {
         return;
     }
+
+    Serial.println("[CAMERA] Releasing framebuffer");
 
     esp_camera_fb_return(currentFrame);
     currentFrame = nullptr;

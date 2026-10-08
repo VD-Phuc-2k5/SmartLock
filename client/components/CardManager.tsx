@@ -26,7 +26,12 @@ export default function CardManager() {
                 if (cancelled) {
                     return;
                 }
-                setError(err instanceof Error ? err.message : 'Failed to load cards');
+
+                setError(
+                    err instanceof Error
+                        ? err.message
+                        : 'Failed to load cards',
+                );
             } finally {
                 if (!cancelled) {
                     setLoading(false);
@@ -42,14 +47,32 @@ export default function CardManager() {
     }, []);
 
     useEffect(() => {
-        const source = new EventSource(cardApi.eventsUrl());
+        const source = new EventSource(
+            cardApi.eventsUrl(),
+        );
 
         source.onmessage = (event) => {
-            const data = JSON.parse(event.data) as { cards: Card[] };
+            const data =
+                JSON.parse(event.data) as {
+                    cards: Card[];
+                };
+
             setCards(data.cards);
+
             setDraft((prev) => {
-                const prevByUid = new Map(prev.map((c) => [c.uid, c]));
-                return data.cards.map((c) => prevByUid.get(c.uid) ?? c);
+                const prevByUid = new Map(
+                    prev.map((c) => [
+                        c.uid,
+                        c,
+                    ]),
+                );
+
+                return data.cards.map(
+                    (c) =>
+                        prevByUid.get(
+                            c.uid,
+                        ) ?? c,
+                );
             });
         };
 
@@ -58,30 +81,66 @@ export default function CardManager() {
         };
     }, []);
 
-    const dirty = JSON.stringify(draft) !== JSON.stringify(cards);
+    const dirty =
+        JSON.stringify(draft) !==
+        JSON.stringify(cards);
 
     function startEdit(card: Card) {
         setEditingUid(card.uid);
     }
 
-    function updateEmail(uid: string, email: string) {
-        setDraft((prev) => prev.map((c) => (c.uid === uid ? { ...c, email } : c)));
+    function updateEmail(
+        uid: string,
+        email: string,
+    ) {
+        setDraft((prev) =>
+            prev.map((c) =>
+                c.uid === uid
+                    ? {
+                          ...c,
+                          email,
+                      }
+                    : c,
+            ),
+        );
     }
 
     function finishEdit() {
         setEditingUid(null);
     }
 
+    function removeCard(uid: string) {
+        setDraft((prev) =>
+            prev.filter(
+                (card) =>
+                    card.uid !== uid,
+            ),
+        );
+
+        if (editingUid === uid) {
+            setEditingUid(null);
+        }
+    }
+
     async function save() {
         setSaving(true);
         setError(null);
+
         try {
-            const saved = await cardApi.save(draft);
+            const saved =
+                await cardApi.save(
+                    draft,
+                );
+
             setCards(saved);
             setDraft(saved);
             setEditingUid(null);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to save cards');
+            setError(
+                err instanceof Error
+                    ? err.message
+                    : 'Failed to save cards',
+            );
         } finally {
             setSaving(false);
         }
@@ -94,27 +153,43 @@ export default function CardManager() {
     }
 
     if (loading) {
-        return <p className="text-zinc-500">Đang tải danh sách thẻ...</p>;
+        return (
+            <p className="text-zinc-500">
+                Đang tải danh sách thẻ...
+            </p>
+        );
     }
 
     return (
         <div className="w-full max-w-2xl">
             <div className="mb-4 flex items-center justify-between">
-                <h1 className="text-xl font-semibold">Quản lý thẻ RFID</h1>
+                <h1 className="text-xl font-semibold">
+                    Quản lý thẻ RFID
+                </h1>
+
                 <div className="flex gap-2">
                     <button
                         type="button"
                         onClick={save}
-                        disabled={!dirty || saving}
+                        disabled={
+                            !dirty ||
+                            saving
+                        }
                         className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
                     >
-                        {saving ? 'Đang lưu...' : 'Lưu'}
+                        {saving
+                            ? 'Đang lưu...'
+                            : 'Lưu'}
                     </button>
+
                     <button
                         type="button"
                         onClick={cancel}
-                        disabled={!dirty || saving}
-                        className="rounded-md border border-black/[.12] px-4 py-2 text-sm font-medium transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-40"
+                        disabled={
+                            !dirty ||
+                            saving
+                        }
+                        className="rounded-md border border-black/12 px-4 py-2 text-sm font-medium transition-colors hover:bg-black/4 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                         Hủy
                     </button>
@@ -128,53 +203,120 @@ export default function CardManager() {
             )}
 
             {draft.length === 0 ? (
-                <p className="text-zinc-500">Chưa có thẻ RFID nào.</p>
+                <p className="text-zinc-500">
+                    Chưa có thẻ RFID nào.
+                </p>
             ) : (
                 <table className="w-full border-collapse text-sm">
                     <thead>
-                        <tr className="border-b border-black/[.12] text-left">
-                            <th className="py-2 pr-4 font-medium">UID</th>
-                            <th className="py-2 pr-4 font-medium">Email</th>
-                            <th className="py-2 font-medium">Thao tác</th>
+                        <tr className="border-b border-black/12 text-left">
+                            <th className="py-2 pr-4 font-medium">
+                                UID
+                            </th>
+
+                            <th className="py-2 pr-4 font-medium">
+                                Email
+                            </th>
+
+                            <th className="py-2 font-medium">
+                                Thao tác
+                            </th>
                         </tr>
                     </thead>
+
                     <tbody>
                         {draft.map((card) => (
-                            <tr key={card.uid} className="border-b border-black/[.06]">
-                                <td className="py-2 pr-4 font-mono">{card.uid}</td>
+                            <tr
+                                key={card.uid}
+                                className="border-b border-black/12 text-left"
+                            >
+                                <td className="py-2 pr-4 font-mono">
+                                    {card.uid}
+                                </td>
+
                                 <td className="py-2 pr-4">
-                                    {editingUid === card.uid ? (
+                                    {editingUid ===
+                                    card.uid ? (
                                         <input
                                             type="email"
-                                            value={card.email}
-                                            onChange={(e) => updateEmail(card.uid, e.target.value)}
+                                            value={
+                                                card.email
+                                            }
+                                            onChange={(
+                                                e,
+                                            ) =>
+                                                updateEmail(
+                                                    card.uid,
+                                                    e
+                                                        .target
+                                                        .value,
+                                                )
+                                            }
                                             placeholder="Nhập email"
-                                            className="w-full rounded-md border border-black/[.12] px-2 py-1"
+                                            className="w-full rounded-md border border-black/12 px-2 py-1"
                                         />
                                     ) : (
-                                        <span className={card.email ? '' : 'text-zinc-400'}>
-                                            {card.email || '—'}
+                                        <span
+                                            className={
+                                                card.email
+                                                    ? ''
+                                                    : 'text-zinc-400'
+                                            }
+                                        >
+                                            {card.email ||
+                                                '—'}
                                         </span>
                                     )}
                                 </td>
+
                                 <td className="py-2">
-                                    {editingUid === card.uid ? (
+                                    <div className="flex gap-2">
+                                        {editingUid ===
+                                        card.uid ? (
+                                            <button
+                                                type="button"
+                                                onClick={
+                                                    finishEdit
+                                                }
+                                                disabled={
+                                                    saving
+                                                }
+                                                className="rounded-md border border-black/12 px-3 py-1 text-xs font-medium transition-colors hover:bg-black/4 disabled:cursor-not-allowed disabled:opacity-40"
+                                            >
+                                                Xong
+                                            </button>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    startEdit(
+                                                        card,
+                                                    )
+                                                }
+                                                disabled={
+                                                    saving
+                                                }
+                                                className="rounded-md border border-black/12 px-3 py-1 text-xs font-medium transition-colors hover:bg-black/4 disabled:cursor-not-allowed disabled:opacity-40"
+                                            >
+                                                Sửa
+                                            </button>
+                                        )}
+
                                         <button
                                             type="button"
-                                            onClick={finishEdit}
-                                            className="rounded-md border border-black/[.12] px-3 py-1 text-xs font-medium transition-colors hover:bg-black/[.04]"
+                                            onClick={() =>
+                                                removeCard(
+                                                    card.uid,
+                                                )
+                                            }
+                                            disabled={
+                                                saving
+                                            }
+                                            className="rounded-md border border-red-200 px-3 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
                                         >
-                                            Xong
+                                            Xóa
                                         </button>
-                                    ) : (
-                                        <button
-                                            type="button"
-                                            onClick={() => startEdit(card)}
-                                            className="rounded-md border border-black/[.12] px-3 py-1 text-xs font-medium transition-colors hover:bg-black/[.04]"
-                                        >
-                                            Sửa
-                                        </button>
-                                    )}
+                                    </div>
                                 </td>
                             </tr>
                         ))}
