@@ -47,47 +47,226 @@ WebConfigService webConfig(config);
 // WIFI
 // ============================================================
 
+static volatile uint8_t g_lastDisconnectReason = 0;
+
+static void onWifiEvent(WiFiEvent_t event, WiFiEventInfo_t info)
+{
+    switch (event)
+    {
+    case ARDUINO_EVENT_WIFI_STA_CONNECTED:
+        Serial.println("[WIFI][EVT] Associated with AP");
+        break;
+
+    case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
+        g_lastDisconnectReason = info.wifi_sta_disconnected.reason;
+        Serial.printf(
+            "[WIFI][EVT] Disconnected, reason=%u\n",
+            g_lastDisconnectReason);
+        break;
+
+    case ARDUINO_EVENT_WIFI_STA_GOT_IP:
+        Serial.println("[WIFI][EVT] Got IP");
+        break;
+
+    default:
+        break;
+    }
+}
+
+static const char *authModeName(wifi_auth_mode_t m)
+{
+    switch (m)
+    {
+    case WIFI_AUTH_OPEN:            return "OPEN";
+    case WIFI_AUTH_WEP:             return "WEP";
+    case WIFI_AUTH_WPA_PSK:         return "WPA-PSK";
+    case WIFI_AUTH_WPA2_PSK:        return "WPA2-PSK";
+    case WIFI_AUTH_WPA_WPA2_PSK:    return "WPA/WPA2-PSK";
+    case WIFI_AUTH_WPA2_ENTERPRISE: return "WPA2-ENTERPRISE (802.1X)";
+    case WIFI_AUTH_WPA3_PSK:        return "WPA3-PSK";
+    case WIFI_AUTH_WPA2_WPA3_PSK:   return "WPA2/WPA3-PSK";
+    default:                        return "OTHER";
+    }
+}
+
+static const char *disconnectReasonName(uint8_t r)
+{
+    switch (r)
+    {
+    case 2:   return "AUTH_EXPIRE";
+    case 8:   return "ASSOC_LEAVE (tu ngat)";
+    case 15:  return "4WAY_HANDSHAKE_TIMEOUT (sai mat khau)";
+    case 201: return "NO_AP_FOUND";
+    case 202: return "AUTH_FAIL (sai mat khau / sai kieu bao mat)";
+    case 203: return "ASSOC_FAIL";
+    case 204: return "HANDSHAKE_TIMEOUT (sai mat khau)";
+    case 205: return "CONNECTION_FAIL";
+    default:  return "OTHER";
+    }
+}
+
 bool connectWifi()
 {
     const NetworkConfig &networkConfig = config.get();
 
     Serial.println("[WIFI] Connecting...");
-
     Serial.print("[WIFI] SSID: ");
     Serial.println(networkConfig.ssid);
+    Serial.print("[WIFI] Password length: ");
+    Serial.println(networkConfig.password.length());
 
+    // Reset sach trang thai WiFi (tranh con sot tu che do AP / lan thu truoc)
+    WiFi.onEvent(onWifiEvent);
+    WiFi.persistent(false);
+    WiFi.disconnect(true, true);
+    delay(200);
+    WiFi.mode(WIFI_OFF);
+    delay(200);
     WiFi.mode(WIFI_STA);
-
+    WiFi.setSleep(false);
+    WiFi.setAutoReconnect(false);
     delay(100);
 
-    WiFi.begin(
-        networkConfig.ssid.c_str(),
-        networkConfig.password.c_str());
+    // ---- Scan: tim AP manh nhat co dung SSID, lay BSSID + channel + authmode
+    Serial.println("[WIFI] Scanning networks...");
+    const int found = WiFi.scanNetworks();
+    Serial.printf("[WIFI] Found %d networks\n", found);
 
-    const unsigned long start = millis();
+    int bestIdx = -1;
+    int bestRssi = -1000;
 
-    while (
-        WiFi.status() != WL_CONNECTED &&
-        millis() - start < AppConfig::Wifi::TIMEOUT_MS)
+    for (int i = 0; i < found; i++)
     {
-        delay(500);
+        Serial.printf(
+            "[SCAN] %s | RSSI: %d | CH: %d | %s\n",
+            WiFi.SSID(i).c_str(),
+            WiFi.RSSI(i),
+            WiFi.channel(i),
+            authModeName(WiFi.encryptionType(i)));
 
-        Serial.print(".");
+        if (WiFi.SSID(i) == networkConfig.ssid &&
+            WiFi.RSSI(i) > bestRssi)
+        {
+            bestRssi = WiFi.RSSI(i);
+            bestIdx = i;
+        }
     }
 
-    Serial.println();
+    uint8_t bssid[6] = {0};
+    int32_t channel = 0;
+    bool haveTarget = false;
+
+    if (bestIdx >= 0)
+    {
+        const wifi_auth_mode_t auth = WiFi.encryptionType(bestIdx);
+        memcpy(bssid, WiFi.BSSID(bestIdx), 6);
+        channel = WiFi.channel(bestIdx);
+        haveTarget = true;
+
+        Serial.printf(
+            "[WIFI] Target AP: %02X:%02X:%02X:%02X:%02X:%02X CH %d RSSI %d Auth: %s\n",
+            bssid[0], bssid[1], bssid[2], bssid[3], bssid[4], bssid[5],
+            (int)channel, bestRssi, authModeName(auth));
+
+        if (auth == WIFI_AUTH_WPA2_ENTERPRISE)
+        {
+            Serial.println("[WIFI] ERROR: mang dung 802.1X (user/pass dang nhap), "
+                           "WiFi.begin(ssid, pass) KHONG ho tro. "
+                           "Hay dung WiFi khac (hotspot dien thoai) hoac code WPA2-Enterprise.");
+            WiFi.scanDelete();
+            return false;
+        }
+
+        if (auth != WIFI_AUTH_OPEN && networkConfig.password.length() == 0)
+        {
+            Serial.println("[WIFI] ERROR: mang co mat khau nhung password dang TRONG. "
+                           "Vao trang cau hinh (SmartLock-Setup) nhap lai password.");
+            WiFi.scanDelete();
+            return false;
+        }
+
+        if (auth == WIFI_AUTH_OPEN && networkConfig.password.length() > 0)
+        {
+            Serial.println("[WIFI] WARN: mang OPEN nhung co password -> bo qua password");
+        }
+    }
+    else
+    {
+        Serial.println("[WIFI] WARN: khong thay SSID trong ket qua scan "
+                       "(sai ten SSID? SSID co dau cach/ky tu thua?)");
+    }
+
+    WiFi.scanDelete();
+
+    // ---- Thu ket noi: lan 1 khoa BSSID/channel, lan 2-3 de tu do
+    const char *pass =
+        networkConfig.password.length() > 0
+            ? networkConfig.password.c_str()
+            : nullptr;
+
+    constexpr int MAX_ATTEMPTS = 3;
+    constexpr uint32_t ATTEMPT_TIMEOUT_MS = 15000;
+
+    // De driver tu retry noi bo trong luc cho (mang open/captive can vai giay)
+    WiFi.setAutoReconnect(true);
+
+    for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++)
+    {
+        Serial.printf("[WIFI] Attempt %d/%d\n", attempt, MAX_ATTEMPTS);
+
+        if (attempt > 1)
+        {
+            // Chi ngat khi lan truoc da that bai hoan toan
+            WiFi.disconnect(false, false);
+            delay(500);
+        }
+
+        g_lastDisconnectReason = 0;
+
+        if (attempt == 1 && haveTarget)
+        {
+            WiFi.begin(networkConfig.ssid.c_str(), pass, channel, bssid, true);
+        }
+        else
+        {
+            WiFi.begin(networkConfig.ssid.c_str(), pass);
+        }
+
+        const unsigned long start = millis();
+
+        // KHONG thoat som khi gap disconnect reason: driver co the tu retry.
+        while (WiFi.status() != WL_CONNECTED &&
+               millis() - start < ATTEMPT_TIMEOUT_MS)
+        {
+            delay(250);
+        }
+
+        if (WiFi.status() == WL_CONNECTED)
+        {
+            break;
+        }
+
+        Serial.printf(
+            "[WIFI] Attempt %d timeout, status=%d, last reason=%u (%s)\n",
+            attempt,
+            (int)WiFi.status(),
+            g_lastDisconnectReason,
+            disconnectReasonName(g_lastDisconnectReason));
+    }
 
     if (WiFi.status() != WL_CONNECTED)
     {
-        Serial.println("[WIFI] Connection FAILED");
+        Serial.printf(
+            "[WIFI] Connection FAILED, status=%d, reason=%u (%s)\n",
+            (int)WiFi.status(),
+            g_lastDisconnectReason,
+            disconnectReasonName(g_lastDisconnectReason));
         return false;
     }
 
     Serial.println("[WIFI] Connected");
-
     Serial.print("[WIFI] IP: ");
     Serial.println(WiFi.localIP());
-
     Serial.print("[WIFI] RSSI: ");
     Serial.println(WiFi.RSSI());
 
