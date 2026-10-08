@@ -1,5 +1,5 @@
 {
-  description = "Môi trường phát triển Node.js với npm và pnpm";
+  description = "Môi trường phát triển Node.js và Python";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -13,17 +13,22 @@
       in {
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
-            # Node.js runtime (npm comes bundled with nodejs)
             nodejs_22
-            # pnpm được cung cấp riêng
             pnpm
+
+            # Python
+            python3
+            python3Packages.pip
+            python3Packages.pyserial
+            python3Packages.paho-mqtt
           ];
 
           shellHook = ''
-            echo "Môi trường phát triển Node.js đã sẵn sàng"
+            echo "Môi trường phát triển Node.js + Python đã sẵn sàng"
             echo "Node.js: $(node --version)"
             echo "npm:     $(npm --version)"
             echo "pnpm:    $(pnpm --version)"
+            echo "Python:  $(python --version)"
           '';
         };
       });

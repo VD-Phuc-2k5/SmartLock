@@ -8,3 +8,4 @@ wokwigw-linux
 dist
 .env
 cards.json
+.direnv
