@@ -1,0 +1,3 @@
+[submodule "admin-module"]
+	path = admin-module
+	url = https://github.com/dont-wait/smartlockadmin.git
