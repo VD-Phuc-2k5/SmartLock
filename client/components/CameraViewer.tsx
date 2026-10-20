@@ -1,73 +1,105 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000').replace(/\/$/, '');
-const CAMERA_WS_URL = API_URL.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:') + '/api/camera/stream';
+const WEBRTC_URL = (
+    process.env.NEXT_PUBLIC_WEBRTC_URL ?? API_URL.replace(/:\d+$/, ':8081')
+).replace(/\/$/, '');
 
 type CameraState = 'IDLE' | 'STREAMING' | 'CAPTURING' | 'STOPPED' | 'ERROR';
 
 export default function CameraViewer() {
-    const [imageUrl, setImageUrl] = useState<string | null>(null);
+    const videoRef = useRef<HTMLVideoElement>(null);
     const [cameraState, setCameraState] = useState<CameraState>('IDLE');
-    const [connected, setConnected] = useState(false);
+    const [connectionState, setConnectionState] = useState('connecting');
 
     useEffect(() => {
         let cancelled = false;
-        let socket: WebSocket | null = null;
-        let reconnectTimer: number | undefined;
-        let currentUrl: string | null = null;
-        let retryDelay = 500;
+        let peer: RTCPeerConnection | null = null;
+        let stateTimer: number | undefined;
 
-        const connect = () => {
-            if (cancelled) return;
-            socket = new WebSocket(CAMERA_WS_URL);
-            socket.binaryType = 'blob';
+        const connectWebRtc = async () => {
+            try {
+                const pc = new RTCPeerConnection({ iceServers: [] });
+                peer = pc;
+                pc.addTransceiver('video', { direction: 'recvonly' });
 
-            socket.onopen = () => {
-                setConnected(true);
-                retryDelay = 500;
-            };
+                pc.ontrack = (event) => {
+                    if (cancelled || !videoRef.current) return;
+                    videoRef.current.srcObject = event.streams[0] ?? new MediaStream([event.track]);
+                    void videoRef.current.play().catch(() => undefined);
+                };
 
-            socket.onmessage = (event: MessageEvent) => {
-                if (cancelled) return;
+                pc.onconnectionstatechange = () => {
+                    if (cancelled) return;
+                    setConnectionState(pc.connectionState);
+                };
 
-                if (typeof event.data === 'string') {
-                    try {
-                        const message = JSON.parse(event.data) as { type?: string; state?: CameraState };
-                        if (message.type === 'state' && message.state) {
-                            setCameraState(message.state);
-                        }
-                    } catch {
-                        // Ignore malformed status messages.
-                    }
-                    return;
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+
+                // This implementation uses non-trickle ICE; wait for host candidates.
+                if (pc.iceGatheringState !== 'complete') {
+                    await new Promise<void>((resolve) => {
+                        let settled = false;
+                        const finish = () => {
+                            if (settled) return;
+                            settled = true;
+                            window.clearTimeout(timeout);
+                            pc.removeEventListener('icegatheringstatechange', onGatheringChange);
+                            resolve();
+                        };
+                        const onGatheringChange = () => {
+                            if (pc.iceGatheringState === 'complete') finish();
+                        };
+                        const timeout = window.setTimeout(finish, 5000);
+                        pc.addEventListener('icegatheringstatechange', onGatheringChange);
+                    });
                 }
 
-                if (!(event.data instanceof Blob)) return;
-                const nextUrl = URL.createObjectURL(event.data);
-                if (currentUrl) URL.revokeObjectURL(currentUrl);
-                currentUrl = nextUrl;
-                setImageUrl(nextUrl);
-            };
-
-            socket.onerror = () => socket?.close();
-            socket.onclose = () => {
-                setConnected(false);
-                if (cancelled) return;
-                reconnectTimer = window.setTimeout(() => {
-                    retryDelay = Math.min(retryDelay * 2, 5000);
-                    connect();
-                }, retryDelay);
-            };
+                if (cancelled || !pc.localDescription) return;
+                const response = await fetch(`${WEBRTC_URL}/offer`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sdp: pc.localDescription.sdp,
+                        type: pc.localDescription.type,
+                    }),
+                });
+                if (!response.ok) throw new Error(`WebRTC signaling failed (${response.status})`);
+                const answer = await response.json() as RTCSessionDescriptionInit;
+                if (!cancelled) await pc.setRemoteDescription(answer);
+            } catch (error) {
+                console.error('[Camera] WebRTC connection failed:', error);
+                if (!cancelled) setConnectionState('failed');
+            }
         };
 
-        connect();
+        const refreshState = async () => {
+            try {
+                const response = await fetch(`${API_URL}/api/camera/state`, { cache: 'no-store' });
+                if (!response.ok) return;
+                const result = await response.json() as { state?: CameraState };
+                if (!cancelled && result.state) setCameraState(result.state);
+            } catch {
+                // Keep the last known camera state if the API is temporarily unavailable.
+            }
+        };
+
+        void connectWebRtc();
+        void refreshState();
+        stateTimer = window.setInterval(() => void refreshState(), 1000);
+
         return () => {
             cancelled = true;
-            window.clearTimeout(reconnectTimer);
-            socket?.close();
-            if (currentUrl) URL.revokeObjectURL(currentUrl);
+            if (stateTimer !== undefined) window.clearInterval(stateTimer);
+            if (peer) {
+                peer.ontrack = null;
+                peer.onconnectionstatechange = null;
+                peer.close();
+            }
+            if (videoRef.current) videoRef.current.srcObject = null;
         };
     }, []);
 
@@ -79,28 +111,35 @@ export default function CameraViewer() {
         ERROR: 'Có lỗi khi chụp ảnh',
     };
 
+    const isConnected = connectionState === 'connected';
+
     return (
         <section className="w-full max-w-2xl">
             <div className="mb-3 flex items-center justify-between gap-3">
                 <h2 className="text-xl font-semibold">Camera Smart Lock</h2>
-                <span className={`flex items-center gap-2 text-xs ${connected ? 'text-green-600' : 'text-amber-500'}`}>
-                    <span className={`h-2 w-2 rounded-full ${connected ? 'bg-green-500' : 'bg-amber-500'}`} />
-                    {connected ? 'WebSocket connected' : 'Connecting...'}
+                <span className={`flex items-center gap-2 text-xs ${isConnected ? 'text-green-600' : 'text-amber-500'}`}>
+                    <span className={`h-2 w-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-amber-500'}`} />
+                    {isConnected ? 'WebRTC connected' : `WebRTC ${connectionState}`}
                 </span>
             </div>
 
             <div className="relative aspect-video overflow-hidden rounded-lg border border-black/12 bg-black">
-                {imageUrl && (
-                    <img src={imageUrl} alt="Smart Lock Camera" className="block h-full w-full object-contain" />
-                )}
-                {!imageUrl && (
-                    <div className="absolute inset-0 flex items-center justify-center px-4 text-center text-sm text-white">
-                        Đang chờ hình ảnh camera...
-                    </div>
-                )}
+                <video
+                    ref={videoRef}
+                    autoPlay
+                    muted
+                    playsInline
+                    className="block h-full w-full object-contain"
+                    aria-label="Smart Lock live camera"
+                />
                 {cameraState === 'STREAMING' && (
                     <div className="absolute left-2 top-2 flex items-center gap-2 rounded bg-red-600/90 px-2 py-1 text-xs text-white">
                         <span className="h-2 w-2 animate-pulse rounded-full bg-white" /> LIVE
+                    </div>
+                )}
+                {connectionState === 'failed' && (
+                    <div className="absolute inset-0 flex items-center justify-center px-4 text-center text-sm text-white">
+                        Không kết nối được WebRTC. Hãy kiểm tra dịch vụ camera trên cổng 8081.
                     </div>
                 )}
             </div>

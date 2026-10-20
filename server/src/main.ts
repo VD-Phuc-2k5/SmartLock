@@ -35,6 +35,7 @@ const cardEvents = new CardEventBus();
 
 let latestCameraFrame: Buffer | null = null;
 let cameraState: 'IDLE' | 'STREAMING' | 'CAPTURING' | 'STOPPED' | 'ERROR' = 'IDLE';
+let webRtcForwardingWarningShown = false;
 const cameraWebSocketServer = new WebSocketServer({ noServer: true });
 
 function broadcastCameraState(state: typeof cameraState): void {
@@ -533,6 +534,24 @@ const server =
                     latestCameraFrame = frame;
                     broadcastCameraFrame(frame);
 
+                    // Forward frames to the WebRTC media service without
+                    // blocking the serial gateway's HTTP upload response.
+                    const webrtcFrameUrl =
+                        process.env.WEBRTC_FRAME_URL ??
+                        'http://127.0.0.1:8081/frame';
+                    void fetch(webrtcFrameUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'image/jpeg' },
+                        body: new Uint8Array(frame),
+                    }).then(() => {
+                        webRtcForwardingWarningShown = false;
+                    }).catch((error: unknown) => {
+                        if (!webRtcForwardingWarningShown) {
+                            console.error('[CAMERA] WebRTC frame forwarding failed:', error);
+                            webRtcForwardingWarningShown = true;
+                        }
+                    });
+
                     const isFinalCapture =
                         req.headers['x-camera-capture'] === 'final';
 
@@ -579,6 +598,15 @@ const server =
             }
 
             // ==================================================
+            // GET /api/camera/state
+            // ==================================================
+
+            if (req.method === 'GET' && req.url === '/api/camera/state') {
+                sendJson(res, 200, { state: cameraState });
+                return;
+            }
+
+            // ==================================================
             // POST /api/camera/state
             // ==================================================
 
@@ -595,6 +623,14 @@ const server =
                     }
 
                     broadcastCameraState(state as typeof cameraState);
+                    void fetch(
+                        process.env.WEBRTC_STATE_URL ?? 'http://127.0.0.1:8081/state',
+                        {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ state }),
+                        },
+                    ).catch(() => undefined);
                     sendJson(res, 200, { success: true, state });
                 } catch (error) {
                     console.error('[CAMERA] State update error:', error);

@@ -245,3 +245,14 @@ node .gitnexus/run.cjs detect-changes --scope all --repo .
 
 - [HiveMQ MQTT Essentials: Topics, Wildcards, and Best Practices](https://www.hivemq.com/blog/mqtt-essentials-part-5-mqtt-topics-best-practices/) — topic hierarchy, topic filters, `+`/`#` wildcards, and naming guidance.
 - [PubSubClient on GitHub](https://github.com/knolleary/pubsubclient) — Arduino MQTT client capabilities, supported hardware, QoS behavior, and packet-size defaults.
+
+## Camera preview over WebRTC
+
+The browser receives camera video over WebRTC. The serial gateway continues posting JPEG frames to the TypeScript API, which forwards each frame to the WebRTC media service.
+
+1. Enter the Nix development shell (`nix develop`) so the Python `aiortc`, `aiohttp`, and PyAV dependencies are available.
+2. Start the media service from the repository root: `python server/webrtc-camera.py` (default port `8081`).
+3. Start the API in `server/` and the Next.js client in `client/` as described above. Copy `client/.env.example` to `client/.env.local` if the API uses port `3001`.
+4. Start `serial-mqtt-gateway.py` and flash the firmware. Press **B** to stream; press **C** to stop and save the final image.
+
+The included ICE configuration is intended for a trusted local network without STUN/TURN. Allow UDP traffic for WebRTC between the browser and media service; remote access across NAT/firewalls may require STUN/TURN configuration.

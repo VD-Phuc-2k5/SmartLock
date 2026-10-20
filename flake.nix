@@ -21,6 +21,9 @@
             python3Packages.pip
             python3Packages.pyserial
             python3Packages.paho-mqtt
+            python3Packages.aiortc
+            python3Packages.aiohttp
+            python3Packages.av
           ];
 
           shellHook = ''
