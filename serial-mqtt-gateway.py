@@ -1,4 +1,5 @@
 import sys
+import json
 import time
 import threading
 from typing import Optional
@@ -22,6 +23,11 @@ MQTT_TOPIC = "smartlock/#"
 CAMERA_URL = (
     "http://127.0.0.1:3001"
     "/api/camera/frame"
+)
+
+CAMERA_STATE_URL = (
+    "http://127.0.0.1:3001"
+    "/api/camera/state"
 )
 
 SERIAL_TIMEOUT = 1.0
@@ -209,6 +215,7 @@ def read_line(
 
 def upload_camera_frame(
     frame: bytes,
+    final_capture: bool = False,
 ) -> bool:
     if not frame:
         print(
@@ -230,6 +237,7 @@ def upload_camera_frame(
         headers={
             "Content-Type": "image/jpeg",
             "Content-Length": str(len(frame)),
+            "X-Camera-Capture": "final" if final_capture else "preview",
         },
     )
 
@@ -279,6 +287,22 @@ def upload_camera_frame(
         return False
 
 
+def post_camera_state(state: str) -> None:
+    payload = json.dumps({"state": state}).encode("utf-8")
+    request = urllib.request.Request(
+        CAMERA_STATE_URL,
+        data=payload,
+        method="POST",
+        headers={"Content-Type": "application/json"},
+    )
+
+    try:
+        with urllib.request.urlopen(request, timeout=3) as response:
+            print(f"[CAMERA] State {state}: HTTP {response.status}", flush=True)
+    except Exception as exc:
+        print(f"[CAMERA] State update failed: {exc}", flush=True)
+
+
 def handle_camera(
     ser: serial.Serial,
     header: bytes,
@@ -291,15 +315,12 @@ def handle_camera(
     """
 
     try:
-        size_text = header[
+        header_parts = header[
             len(CAMERA_HEADER):
-        ].decode(
-            "ascii"
-        ).strip()
+        ].decode("ascii").strip().split("\t")
 
-        size = int(
-            size_text
-        )
+        size = int(header_parts[0])
+        final_capture = len(header_parts) > 1 and header_parts[1] == "FINAL"
 
     except (
         UnicodeDecodeError,
@@ -361,9 +382,13 @@ def handle_camera(
             flush=True,
         )
 
-    upload_camera_frame(
-        frame
+    uploaded = upload_camera_frame(
+        frame,
+        final_capture=final_capture,
     )
+
+    if final_capture:
+        post_camera_state("STOPPED" if uploaded else "ERROR")
 
 
 # ============================================================
@@ -389,6 +414,19 @@ def handle_serial_line(
             ser,
             line,
         )
+        return
+
+    if line.startswith(b"@CAMSTATE\t"):
+        try:
+            state = line.split(b"\t", 1)[1].decode("ascii").strip()
+        except (IndexError, UnicodeDecodeError):
+            print(f"[CAMERA] Invalid state message: {line!r}", flush=True)
+            return
+
+        if state in {"STREAMING", "CAPTURING", "STOPPED", "ERROR"}:
+            post_camera_state(state)
+        else:
+            print(f"[CAMERA] Unknown state: {state}", flush=True)
         return
 
     if line.startswith(

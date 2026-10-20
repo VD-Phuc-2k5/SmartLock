@@ -9,3 +9,4 @@ dist
 .env
 cards.json
 .direnv
+server/data/

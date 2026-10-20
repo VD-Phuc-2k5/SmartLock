@@ -1,4 +1,7 @@
 import http from 'node:http';
+import { mkdir, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import WebSocket, { WebSocketServer } from 'ws';
 import { config } from './config.js';
 import { RandomOtpGenerator } from './otp/OtpGenerator.js';
 import { InMemoryOtpStore } from './otp/OtpStore.js';
@@ -31,6 +34,27 @@ const cardService = new CardService(cardStore);
 const cardEvents = new CardEventBus();
 
 let latestCameraFrame: Buffer | null = null;
+let cameraState: 'IDLE' | 'STREAMING' | 'CAPTURING' | 'STOPPED' | 'ERROR' = 'IDLE';
+const cameraWebSocketServer = new WebSocketServer({ noServer: true });
+
+function broadcastCameraState(state: typeof cameraState): void {
+    cameraState = state;
+    const message = JSON.stringify({ type: 'state', state });
+
+    for (const client of cameraWebSocketServer.clients) {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(message);
+        }
+    }
+}
+
+function broadcastCameraFrame(frame: Buffer): void {
+    for (const client of cameraWebSocketServer.clients) {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(frame);
+        }
+    }
+}
 
 await mqttClient.connect();
 
@@ -506,8 +530,22 @@ const server =
                         return;
                     }
 
-                    latestCameraFrame =
-                        frame;
+                    latestCameraFrame = frame;
+                    broadcastCameraFrame(frame);
+
+                    const isFinalCapture =
+                        req.headers['x-camera-capture'] === 'final';
+
+                    if (isFinalCapture) {
+                        const captureDirectory = path.join(process.cwd(), 'data', 'captures');
+                        await mkdir(captureDirectory, { recursive: true });
+                        await writeFile(
+                            path.join(captureDirectory, 'latest.jpg'),
+                            frame,
+                        );
+                        broadcastCameraState('STOPPED');
+                        console.log(`[CAMERA] Final image saved to ${path.join(captureDirectory, 'latest.jpg')}`);
+                    }
 
                     console.log(
                         `[CAMERA] Frame received: ${frame.length} bytes`,
@@ -537,6 +575,31 @@ const server =
                     );
                 }
 
+                return;
+            }
+
+            // ==================================================
+            // POST /api/camera/state
+            // ==================================================
+
+            if (req.method === 'POST' && req.url === '/api/camera/state') {
+                try {
+                    const body = await readBody(req);
+                    const parsed = parseJson(body);
+                    const state = parsed.state;
+                    const allowedStates = new Set(['STREAMING', 'CAPTURING', 'STOPPED', 'ERROR']);
+
+                    if (typeof state !== 'string' || !allowedStates.has(state)) {
+                        sendJson(res, 400, { error: 'invalid camera state' });
+                        return;
+                    }
+
+                    broadcastCameraState(state as typeof cameraState);
+                    sendJson(res, 200, { success: true, state });
+                } catch (error) {
+                    console.error('[CAMERA] State update error:', error);
+                    sendJson(res, 400, { error: 'invalid camera state payload' });
+                }
                 return;
             }
 
@@ -755,6 +818,39 @@ const server =
             );
         },
     );
+
+// ============================================================
+// CAMERA WEBSOCKET
+// ============================================================
+
+server.on('upgrade', (request, socket, head) => {
+    let pathname: string;
+
+    try {
+        const host = request.headers.host ?? 'localhost';
+        pathname = new URL(request.url ?? '/', `http://${host}`).pathname;
+    } catch {
+        socket.destroy();
+        return;
+    }
+
+    if (pathname !== '/api/camera/stream') {
+        socket.destroy();
+        return;
+    }
+
+    cameraWebSocketServer.handleUpgrade(request, socket, head, (client) => {
+        cameraWebSocketServer.emit('connection', client, request);
+    });
+});
+
+cameraWebSocketServer.on('connection', (client) => {
+    client.send(JSON.stringify({ type: 'state', state: cameraState }));
+
+    if (latestCameraFrame && client.readyState === WebSocket.OPEN) {
+        client.send(latestCameraFrame);
+    }
+});
 
 // ============================================================
 // START SERVER

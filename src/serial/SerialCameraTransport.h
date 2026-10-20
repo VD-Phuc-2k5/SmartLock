@@ -5,5 +5,5 @@
 class SerialCameraTransport
 {
 public:
-    bool send(const uint8_t *data, size_t size);
+    bool send(const uint8_t *data, size_t size, bool finalCapture = false);
 };

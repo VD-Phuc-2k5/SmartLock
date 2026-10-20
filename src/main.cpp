@@ -35,6 +35,11 @@ DoorLock doorLock;
 CameraService camera;
 SerialCameraTransport cameraTransport;
 
+static constexpr uint32_t CAMERA_STREAM_INTERVAL_MS = 200;
+static uint32_t lastCameraStreamAt = 0;
+static bool cameraReady = false;
+static bool cameraStreaming = false;
+
 LockController controller(
     lcd,
     mqtt,
@@ -449,7 +454,8 @@ bool connectWifi()
 
 bool uploadCameraFrame(
     const uint8_t *data,
-    size_t size)
+    size_t size,
+    bool finalCapture = false)
 {
     if (
         data == nullptr ||
@@ -473,7 +479,8 @@ bool uploadCameraFrame(
     const bool sent =
         cameraTransport.send(
             data,
-            size);
+            size,
+            finalCapture);
 
     if (sent)
     {
@@ -759,7 +766,9 @@ void setup()
     Serial.println(
         "[SETUP] 11. Camera");
 
-    if (!camera.begin())
+    cameraReady = camera.begin();
+
+    if (!cameraReady)
     {
         Serial.println(
             "[SETUP] Camera FAILED");
@@ -835,6 +844,32 @@ void loop()
     mqtt.loop();
 
     // --------------------------------------------------------
+    // CAMERA STREAM (B starts, C stops and captures final image)
+    // --------------------------------------------------------
+
+    const uint32_t now = millis();
+
+    if (
+        cameraStreaming &&
+        cameraReady &&
+        now - lastCameraStreamAt >= CAMERA_STREAM_INTERVAL_MS)
+    {
+        lastCameraStreamAt = now;
+
+        CameraFrame frame = camera.capture();
+
+        if (frame.data != nullptr && frame.size > 0)
+        {
+            uploadCameraFrame(
+                frame.data,
+                frame.size,
+                false);
+        }
+
+        camera.release();
+    }
+
+    // --------------------------------------------------------
     // RFID
     // --------------------------------------------------------
 
@@ -868,55 +903,67 @@ void loop()
         Serial.println(
             key);
 
-        if (key == 'C')
+        if (key == 'B')
         {
-            Serial.println(
-                "[CAMERA] Capture requested");
-
-            CameraFrame frame =
-                camera.capture();
-
-            if (
-                frame.data != nullptr &&
-                frame.size > 0)
+            if (!cameraReady)
             {
-                Serial.print(
-                    "[CAMERA] Uploading ");
+                Serial.println("[CAMERA] Cannot stream: camera not ready");
+            }
+            else if (!cameraStreaming)
+            {
+                cameraStreaming = true;
+                lastCameraStreamAt = 0;
+                Serial.println("@CAMSTATE\tSTREAMING");
+                Serial.println("[CAMERA] Streaming started");
+            }
+        }
+        else if (key == 'C')
+        {
+            if (!cameraReady)
+            {
+                Serial.println("[CAMERA] Cannot capture: camera not ready");
+            }
+            else if (cameraStreaming)
+            {
+                cameraStreaming = false;
+                Serial.println("@CAMSTATE\tCAPTURING");
+                Serial.println("[CAMERA] Stream stopped; capturing final image");
 
-                Serial.print(
-                    frame.size);
+                CameraFrame frame = camera.capture();
 
-                Serial.println(
-                    " bytes...");
-
-                const bool uploaded =
-                    uploadCameraFrame(
-                        frame.data,
-                        frame.size);
-
-                if (uploaded)
+                if (frame.data != nullptr && frame.size > 0)
                 {
-                    Serial.println(
-                        "[CAMERA] Upload OK");
+                    const bool saved = uploadCameraFrame(
+                        frame.data,
+                        frame.size,
+                        true);
+
+                    if (saved)
+                    {
+                        Serial.println("[CAMERA] Final image sent to gateway");
+                    }
+                    else
+                    {
+                        Serial.println("[CAMERA] Final image send FAILED");
+                        Serial.println("@CAMSTATE\tERROR");
+                    }
                 }
                 else
                 {
-                    Serial.println(
-                        "[CAMERA] Upload FAILED");
+                    Serial.println("[CAMERA] Final capture FAILED");
+                    Serial.println("@CAMSTATE\tERROR");
                 }
+
+                camera.release();
             }
             else
             {
-                Serial.println(
-                    "[CAMERA] Capture FAILED");
+                Serial.println("[CAMERA] Press B to start streaming first");
             }
-
-            camera.release();
         }
         else
         {
-            controller.onKey(
-                key);
+            controller.onKey(key);
         }
     }
 

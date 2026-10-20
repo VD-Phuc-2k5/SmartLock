@@ -2,7 +2,8 @@
 
 bool SerialCameraTransport::send(
     const uint8_t *data,
-    size_t size)
+    size_t size,
+    bool finalCapture)
 {
     if (data == nullptr || size == 0)
     {
@@ -10,7 +11,14 @@ bool SerialCameraTransport::send(
     }
 
     Serial.print("@CAM\t");
-    Serial.println(size);
+    Serial.print(size);
+
+    if (finalCapture)
+    {
+        Serial.print("\tFINAL");
+    }
+
+    Serial.println();
 
     const size_t written =
         Serial.write(data, size);
